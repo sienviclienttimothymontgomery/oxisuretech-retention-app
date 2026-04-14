@@ -14,8 +14,8 @@ export default function WebDashboardPage() {
     <>
       <div className="page-container pb-20">
         {/* Header */}
-        <header className="flex items-center justify-between pt-2 pb-4">
-          <Image src="/logo.png" alt="OxiSure Tech" width={100} height={30} className="h-7 w-auto" />
+        <header className="flex items-center justify-between py-2">
+          <Image src="/logo.png" alt="OxiSure Tech" width={380} height={112} className="h-28 w-auto" />
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-[var(--radius-full)] bg-[var(--color-accent)]/10">
             <Globe size={12} className="text-[var(--color-accent)]" />
             <span className="text-xs font-semibold text-[var(--color-accent)]">Web Tracker</span>
@@ -37,7 +37,7 @@ export default function WebDashboardPage() {
         />
 
         {/* Reorder CTA */}
-        <section className="mb-6">
+        <section className="mb-4">
           <CTASection
             headline="Time to Reorder?"
             description="Order now and save with your early reorder discount."
@@ -50,7 +50,7 @@ export default function WebDashboardPage() {
         </section>
 
         {/* Product summary */}
-        <section className="mb-6">
+        <section className="mb-4">
           <h2 className="text-sm font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-3">
             Product Details
           </h2>
@@ -70,7 +70,7 @@ export default function WebDashboardPage() {
         </section>
 
         {/* Reminder status */}
-        <section className="mb-6">
+        <section className="mb-4">
           <h2 className="text-sm font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-3">
             Reminders
           </h2>

@@ -14,14 +14,14 @@ const STEPS = ["Type", "Product", "Quantity", "Alerts", "Done"];
 export default function AppConfirmProductPage() {
   return (
     <>
-      <div className="page-container pb-16">
-        <header className="flex items-center justify-center pt-2 pb-4">
-          <Image src="/logo.png" alt="OxiSure Tech" width={100} height={30} className="h-7 w-auto" />
+      <div className="page-container pb-8">
+        <header className="flex items-center justify-center py-2">
+          <Image src="/logo.png" alt="OxiSure Tech" width={380} height={112} className="h-28 w-auto" />
         </header>
 
         <StepIndicator steps={STEPS} currentStep={1} />
 
-        <section className="mb-6">
+        <section className="mb-4">
           <h1 className="text-xl font-bold text-[var(--color-text)] mb-2">
             Confirm Your Product
           </h1>
@@ -38,7 +38,7 @@ export default function AppConfirmProductPage() {
           />
         </section>
 
-        <div className="bg-[var(--color-info-bg)] rounded-[var(--radius-md)] p-4 mb-8">
+        <div className="bg-[var(--color-info-bg)] rounded-[var(--radius-md)] p-4 mb-5">
           <p className="text-sm text-[var(--color-info)] font-medium">
             Recommended replacement cycle: <strong>Every 30 days</strong>
           </p>

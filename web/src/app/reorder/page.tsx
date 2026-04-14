@@ -47,12 +47,12 @@ export default function ReorderPage() {
 
   return (
     <>
-      <div className="page-container pb-16">
-        <header className="flex items-center justify-center pt-2 pb-4">
-          <Image src="/logo.png" alt="OxiSure Tech" width={120} height={36} className="h-9 w-auto" />
+      <div className="page-container pb-8">
+        <header className="flex items-center justify-center py-2">
+          <Image src="/logo.png" alt="OxiSure Tech" width={320} height={96} className="h-24 w-auto" />
         </header>
 
-        <section className="mb-6">
+        <section className="mb-4">
           <h1 className="text-2xl font-bold text-[var(--color-text)] mb-2">
             Reorder Your Tubing
           </h1>
@@ -62,7 +62,7 @@ export default function ReorderPage() {
         </section>
 
         {/* Discount highlight */}
-        <div className="bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-primary-light)] rounded-[var(--radius-md)] p-4 mb-6 text-white">
+        <div className="bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-primary-light)] rounded-[var(--radius-md)] p-4 mb-4 text-white">
           <div className="flex items-center gap-2 mb-1">
             <Tag size={18} />
             <span className="font-bold text-lg">{tier.percent} Off</span>
@@ -72,7 +72,7 @@ export default function ReorderPage() {
         </div>
 
         {/* Demo: status toggle (prototype-only) */}
-        <div className="mb-6 p-3 bg-[var(--color-bg-muted)] rounded-[var(--radius-sm)] border border-dashed border-[var(--color-border)]">
+        <div className="mb-4 p-3 bg-[var(--color-bg-muted)] rounded-[var(--radius-sm)] border border-dashed border-[var(--color-border)]">
           <p className="text-xs font-semibold text-[var(--color-text-muted)] mb-2 uppercase tracking-wider">
             ⚙ Demo: Switch discount tier
           </p>
@@ -95,7 +95,7 @@ export default function ReorderPage() {
         </div>
 
         {/* Product with quantity */}
-        <section className="mb-6">
+        <section className="mb-4">
           <h2 className="text-sm font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-3">
             Your Order
           </h2>
@@ -110,7 +110,7 @@ export default function ReorderPage() {
         </section>
 
         {/* Order summary */}
-        <section className="mb-8">
+        <section className="mb-5">
           <Card bordered>
             <div className="space-y-2">
               <div className="flex items-center justify-between">

@@ -11,22 +11,22 @@ import PrototypeNav from "@/components/ui/PrototypeNav";
 export default function WebCheckEmailPage() {
   return (
     <>
-      <div className="page-container justify-center items-center text-center pb-16">
-        <Image src="/logo.png" alt="OxiSure Tech" width={120} height={36} className="h-9 w-auto mb-8" />
+      <div className="page-container justify-center items-center text-center pb-8">
+        <Image src="/logo.png" alt="OxiSure Tech" width={320} height={96} className="h-24 w-auto mb-5" />
 
         {/* Email sent state */}
-        <div className="w-20 h-20 rounded-full bg-[var(--color-info-bg)] flex items-center justify-center mb-6 animate-fade-up">
+        <div className="w-20 h-20 rounded-full bg-[var(--color-info-bg)] flex items-center justify-center mb-4 animate-fade-up">
           <Mail size={40} className="text-[var(--color-info)]" />
         </div>
 
         <h1 className="text-2xl font-bold text-[var(--color-text)] mb-2">
           Check Your Email
         </h1>
-        <p className="text-base text-[var(--color-text-secondary)] max-w-xs mx-auto mb-8">
+        <p className="text-base text-[var(--color-text-secondary)] max-w-xs mx-auto mb-5">
           We sent a magic link to your inbox. Click it to access your dashboard instantly.
         </p>
 
-        <Card bordered className="mb-8 text-left">
+        <Card bordered className="mb-5 text-left">
           <div className="space-y-3">
             <div className="flex items-start gap-3">
               <span className="w-6 h-6 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center text-xs font-bold text-[var(--color-primary)] shrink-0">1</span>

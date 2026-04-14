@@ -10,12 +10,12 @@ import PrototypeNav from "@/components/ui/PrototypeNav";
 export default function AppWelcomePage() {
   return (
     <>
-      <div className="page-container justify-center items-center text-center pb-16">
+      <div className="page-container justify-center items-center text-center pb-8">
         {/* Logo */}
-        <Image src="/logo.png" alt="OxiSure Tech" width={140} height={42} className="h-10 w-auto mb-8" />
+        <Image src="/logo.png" alt="OxiSure Tech" width={380} height={112} className="h-28 w-auto mb-5" />
 
         {/* Welcome illustration area */}
-        <div className="w-24 h-24 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center mb-6 animate-fade-up">
+        <div className="w-24 h-24 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center mb-4 animate-fade-up">
           <Sparkles size={40} className="text-[var(--color-primary)]" />
         </div>
 

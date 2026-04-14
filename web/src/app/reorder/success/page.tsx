@@ -12,9 +12,9 @@ import PrototypeNav from "@/components/ui/PrototypeNav";
 export default function ReorderSuccessPage() {
   return (
     <>
-      <div className="page-container pb-16 justify-center">
-        <header className="flex items-center justify-center pt-2 pb-4">
-          <Image src="/logo.png" alt="OxiSure Tech" width={120} height={36} className="h-9 w-auto" />
+      <div className="page-container pb-8 justify-center">
+        <header className="flex items-center justify-center py-2">
+          <Image src="/logo.png" alt="OxiSure Tech" width={320} height={96} className="h-24 w-auto" />
         </header>
 
         <SuccessState
@@ -22,7 +22,7 @@ export default function ReorderSuccessPage() {
           message="Your tubing is on the way. We've automatically reset your replacement countdown."
         >
           {/* Lifecycle reset info */}
-          <Card bordered className="text-left mb-6">
+          <Card bordered className="text-left mb-4">
             <div className="flex items-center gap-3 mb-3">
               <RotateCcw size={18} className="text-[var(--color-primary)]" />
               <span className="font-semibold text-sm text-[var(--color-text)]">Cycle Reset</span>

@@ -17,14 +17,14 @@ export default function AppNotificationsPage() {
 
   return (
     <>
-      <div className="page-container pb-16">
-        <header className="flex items-center justify-center pt-2 pb-4">
-          <Image src="/logo.png" alt="OxiSure Tech" width={100} height={30} className="h-7 w-auto" />
+      <div className="page-container pb-8">
+        <header className="flex items-center justify-center py-2">
+          <Image src="/logo.png" alt="OxiSure Tech" width={380} height={112} className="h-28 w-auto" />
         </header>
 
         <StepIndicator steps={STEPS} currentStep={3} />
 
-        <section className="mb-6">
+        <section className="mb-4">
           <h1 className="text-xl font-bold text-[var(--color-text)] mb-2">
             Stay on Schedule
           </h1>
@@ -33,7 +33,7 @@ export default function AppNotificationsPage() {
           </p>
         </section>
 
-        <section className="space-y-3 mb-8">
+        <section className="space-y-3 mb-5">
           {/* Push notifications toggle */}
           <Card bordered>
             <div className="flex items-center gap-4">
@@ -99,7 +99,7 @@ export default function AppNotificationsPage() {
 
         {/* Push benefit note */}
         {!pushEnabled && !emailEnabled && (
-          <div className="bg-[var(--color-warning-bg)] rounded-[var(--radius-md)] p-4 mb-6">
+          <div className="bg-[var(--color-warning-bg)] rounded-[var(--radius-md)] p-4 mb-4">
             <p className="text-sm text-[var(--color-warning)]">
               Without reminders, you&apos;ll need to check back manually. We recommend enabling at least one.
             </p>

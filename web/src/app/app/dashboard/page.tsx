@@ -20,8 +20,8 @@ export default function AppDashboardPage() {
     <>
       <div className="page-container pb-20">
         {/* Header */}
-        <header className="flex items-center justify-between pt-2 pb-4">
-          <Image src="/logo.png" alt="OxiSure Tech" width={100} height={30} className="h-7 w-auto" />
+        <header className="flex items-center justify-between py-2">
+          <Image src="/logo.png" alt="OxiSure Tech" width={380} height={112} className="h-28 w-auto" />
           <button
             type="button"
             className="w-10 h-10 rounded-full bg-[var(--color-bg-muted)] flex items-center justify-center text-[var(--color-text-muted)]"
@@ -38,7 +38,7 @@ export default function AppDashboardPage() {
         </section>
 
         {/* View toggle (self vs caregiver) */}
-        <div className="flex bg-[var(--color-bg-muted)] rounded-[var(--radius-md)] p-1 mb-6">
+        <div className="flex bg-[var(--color-bg-muted)] rounded-[var(--radius-md)] p-1 mb-4">
           <button
             type="button"
             onClick={() => setView("self")}
@@ -77,7 +77,7 @@ export default function AppDashboardPage() {
             />
 
             {/* Reorder CTA */}
-            <section className="mb-6">
+            <section className="mb-4">
               <CTASection
                 headline="Ready to Reorder?"
                 description="Order now and save — your next tube is almost due."
@@ -90,7 +90,7 @@ export default function AppDashboardPage() {
             </section>
 
             {/* Product summary */}
-            <section className="mb-6">
+            <section className="mb-4">
               <h2 className="text-sm font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-3">
                 Your Product
               </h2>
@@ -110,7 +110,7 @@ export default function AppDashboardPage() {
             </section>
 
             {/* Reminder status */}
-            <section className="mb-6">
+            <section className="mb-4">
               <h2 className="text-sm font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-3">
                 Reminder Settings
               </h2>
@@ -147,7 +147,7 @@ export default function AppDashboardPage() {
         ) : (
           /* ===== Caregiver View ===== */
           <>
-            <section className="mb-6">
+            <section className="mb-4">
               <h2 className="text-base font-semibold text-[var(--color-text)] mb-1">
                 People You Manage
               </h2>

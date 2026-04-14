@@ -16,14 +16,14 @@ export default function AppUserTypePage() {
 
   return (
     <>
-      <div className="page-container pb-16">
-        <header className="flex items-center justify-center pt-2 pb-4">
-          <Image src="/logo.png" alt="OxiSure Tech" width={100} height={30} className="h-7 w-auto" />
+      <div className="page-container pb-8">
+        <header className="flex items-center justify-center py-2">
+          <Image src="/logo.png" alt="OxiSure Tech" width={380} height={112} className="h-28 w-auto" />
         </header>
 
         <StepIndicator steps={STEPS} currentStep={0} />
 
-        <section className="mb-6">
+        <section className="mb-4">
           <h1 className="text-xl font-bold text-[var(--color-text)] mb-2">
             Who is this for?
           </h1>
@@ -32,7 +32,7 @@ export default function AppUserTypePage() {
           </p>
         </section>
 
-        <section className="space-y-3 mb-8" role="radiogroup" aria-label="User type selection">
+        <section className="space-y-3 mb-5" role="radiogroup" aria-label="User type selection">
           <RadioCard
             value="self"
             label="Just for me"

@@ -15,14 +15,14 @@ export default function ChoosePathPage() {
 
   return (
     <>
-      <div className="page-container pb-16">
+      <div className="page-container pb-8">
         {/* Header */}
-        <header className="flex items-center justify-center pt-2 pb-4">
-          <Image src="/logo.png" alt="OxiSure Tech" width={120} height={36} className="h-9 w-auto" />
+        <header className="flex items-center justify-center py-2">
+          <Image src="/logo.png" alt="OxiSure Tech" width={320} height={96} className="h-24 w-auto" />
         </header>
 
         {/* Heading */}
-        <section className="text-center mb-6">
+        <section className="text-center mb-4">
           <h1 className="text-2xl font-bold text-[var(--color-text)] mb-2">
             How Would You Like to Track?
           </h1>
@@ -32,7 +32,7 @@ export default function ChoosePathPage() {
         </section>
 
         {/* Path cards */}
-        <section className="space-y-4 mb-8" role="radiogroup" aria-label="Choose tracking method">
+        <section className="space-y-3 mb-5" role="radiogroup" aria-label="Choose tracking method">
           <PathCard
             path="app"
             selected={selected === "app"}

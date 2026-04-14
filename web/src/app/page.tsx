@@ -3,28 +3,25 @@
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Shield, Clock, Bell, PackageCheck } from "lucide-react";
+import { ArrowRight, Shield, Clock, Bell, PackageCheck, ScanLine } from "lucide-react";
 import Button from "@/components/ui/Button";
 import PrototypeNav from "@/components/ui/PrototypeNav";
 
 export default function LandingPage() {
   return (
     <>
-      <div className="page-container justify-between pb-16">
+      <div className="page-container justify-between pb-8">
         {/* Header */}
-        <header className="flex items-center justify-center pt-2 pb-6">
+        <header className="flex items-center justify-center py-2">
           <Image
             src="/logo.png"
             alt="OxiSure Tech"
-            width={160}
-            height={48}
-            priority
-            className="h-12 w-auto"
+            width={420} height={128} priority className="h-32 w-auto"
           />
         </header>
 
         {/* Hero */}
-        <section className="text-center mb-8 animate-fade-up">
+        <section className="text-center mb-5 animate-fade-up">
           <h1 className="text-3xl font-bold text-[var(--color-text)] mb-3 leading-tight">
             Your Tubing. <br />
             Always Fresh. <br />
@@ -36,7 +33,7 @@ export default function LandingPage() {
         </section>
 
         {/* Value props */}
-        <section className="space-y-3 mb-8" aria-label="Features">
+        <section className="space-y-3 mb-5" aria-label="Features">
           {[
             { icon: Clock, text: "Know exactly when it's time to replace" },
             { icon: Bell, text: "Get reminders before you run low" },
@@ -54,7 +51,7 @@ export default function LandingPage() {
         </section>
 
         {/* Product preview */}
-        <section className="flex justify-center mb-8">
+        <section className="flex justify-center mb-5">
           <div className="w-32 h-32 rounded-[var(--radius-lg)] bg-[var(--color-bg-subtle)] border border-[var(--color-border)] flex items-center justify-center overflow-hidden">
             <Image
               src="/product-tubing.png"
@@ -77,6 +74,12 @@ export default function LandingPage() {
             >
               Get Started
             </Button>
+          </Link>
+          <Link href="/activate" className="block">
+            <button className="w-full flex justify-center items-center gap-2 text-sm font-medium text-[var(--color-primary)] hover:bg-[var(--color-primary)] hover:text-white transition-colors py-3 border-2 border-dashed border-[var(--color-primary)]/30 rounded-[var(--radius-md)] bg-[var(--color-bg-subtle)] focus:outline-none">
+              <ScanLine size={18} />
+              Scan FNSKU code to verify product
+            </button>
           </Link>
           <p className="text-center text-xs text-[var(--color-text-muted)]">
             Free to use. No credit card required.

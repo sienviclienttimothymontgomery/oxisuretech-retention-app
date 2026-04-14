@@ -11,14 +11,14 @@ import PrototypeNav from "@/components/ui/PrototypeNav";
 export default function ActivatePage() {
   return (
     <>
-      <div className="page-container justify-center pb-16">
+      <div className="page-container justify-center pb-8">
         {/* Header */}
-        <header className="flex items-center justify-center pt-2 pb-4">
-          <Image src="/logo.png" alt="OxiSure Tech" width={120} height={36} className="h-9 w-auto" />
+        <header className="flex items-center justify-center py-2">
+          <Image src="/logo.png" alt="OxiSure Tech" width={320} height={96} className="h-24 w-auto" />
         </header>
 
         {/* Scan confirmation */}
-        <section className="text-center mb-6 animate-fade-up">
+        <section className="text-center mb-4 animate-fade-up">
           <div className="w-16 h-16 rounded-full bg-[var(--color-success-bg)] flex items-center justify-center mx-auto mb-4">
             <ScanLine size={32} className="text-[var(--color-success)]" />
           </div>
@@ -31,7 +31,7 @@ export default function ActivatePage() {
         </section>
 
         {/* Product card */}
-        <Card className="mb-8" bordered>
+        <Card className="mb-5" bordered>
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-[var(--radius-sm)] bg-[var(--color-bg-subtle)] flex items-center justify-center overflow-hidden shrink-0">
               <Image src="/product-tubing.png" alt="Oxygen Tubing" width={56} height={56} className="object-contain" />
@@ -45,7 +45,7 @@ export default function ActivatePage() {
         </Card>
 
         {/* What you'll get */}
-        <section className="mb-8">
+        <section className="mb-5">
           <h2 className="text-sm font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-3">
             What You&apos;ll Get
           </h2>
