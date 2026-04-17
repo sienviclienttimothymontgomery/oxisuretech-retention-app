@@ -65,7 +65,7 @@ export default function ActivatePage() {
 
         {/* CTA */}
         <section className="mt-auto space-y-3">
-          <Link href="/choose-path" className="block">
+          <Link href="/web/start" className="block">
             <Button variant="primary" size="lg" fullWidth icon={<ArrowRight size={20} />}>
               Set Up My Tracker
             </Button>
