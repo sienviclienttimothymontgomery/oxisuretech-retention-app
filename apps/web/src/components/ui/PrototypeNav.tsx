@@ -22,21 +22,5 @@ const routes = [
 ];
 
 export default function PrototypeNav() {
-  const pathname = usePathname();
-
-  return (
-    <nav className="proto-nav" aria-label="Prototype navigation">
-      <div className="proto-nav-inner">
-        {routes.map((route) => (
-          <Link
-            key={route.href}
-            href={route.href}
-            className={pathname === route.href ? "active" : ""}
-          >
-            {route.label}
-          </Link>
-        ))}
-      </div>
-    </nav>
-  );
+  return null;
 }
