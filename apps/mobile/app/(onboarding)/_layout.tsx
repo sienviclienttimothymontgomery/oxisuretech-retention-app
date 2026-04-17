@@ -1,0 +1,14 @@
+import { Stack } from 'expo-router';
+
+export default function OnboardingLayout() {
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="welcome" />
+      <Stack.Screen name="index" />
+      <Stack.Screen name="confirm-product" />
+      <Stack.Screen name="quantity" />
+      <Stack.Screen name="notifications" />
+    </Stack>
+  );
+}
+
