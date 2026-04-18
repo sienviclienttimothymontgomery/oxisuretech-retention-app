@@ -8,7 +8,6 @@ import RadioCard from "@/components/ui/RadioCard";
 import StepIndicator from "@/components/ui/StepIndicator";
 import Button from "@/components/ui/Button";
 import { submitUserType } from "@/app/actions";
-import PrototypeNav from "@/components/ui/PrototypeNav";
 
 const STEPS = ["Type", "Product", "Quantity", "Done"];
 
@@ -52,16 +51,18 @@ export default function AppUserTypePage() {
           />
         </section>
 
-        <section className="mt-auto">
+        <section className="mt-auto space-y-3">
           <form action={submitUserType}>
             <input type="hidden" name="userType" value={userType} />
             <Button type="submit" variant="primary" size="lg" fullWidth disabled={!userType} icon={<ArrowRight size={20} />}>
               Continue
             </Button>
           </form>
+          <Link href="/app/welcome" className="block text-center text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors py-1">
+            ← Back
+          </Link>
         </section>
       </div>
-      <PrototypeNav />
     </>
   );
 }

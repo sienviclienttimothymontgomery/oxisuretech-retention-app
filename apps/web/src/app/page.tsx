@@ -5,7 +5,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Shield, Clock, Bell, PackageCheck, ScanLine } from "lucide-react";
 import Button from "@/components/ui/Button";
-import PrototypeNav from "@/components/ui/PrototypeNav";
 
 export default function LandingPage() {
   return (
@@ -86,7 +85,6 @@ export default function LandingPage() {
           </p>
         </section>
       </div>
-      <PrototypeNav />
     </>
   );
 }

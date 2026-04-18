@@ -5,7 +5,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { Sparkles } from "lucide-react";
 import Button from "@/components/ui/Button";
-import PrototypeNav from "@/components/ui/PrototypeNav";
 
 export default function AppWelcomePage() {
   return (
@@ -30,14 +29,16 @@ export default function AppWelcomePage() {
         </p>
 
         <div className="w-full mt-auto space-y-3">
-          <Link href="/app/user-type" className="block">
+          <Link href="/app/login" className="block">
             <Button variant="primary" size="lg" fullWidth>
               Let&apos;s Get Started
             </Button>
           </Link>
+          <Link href="/choose-path" className="block text-center text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors py-1">
+            ← Back
+          </Link>
         </div>
       </div>
-      <PrototypeNav />
     </>
   );
 }

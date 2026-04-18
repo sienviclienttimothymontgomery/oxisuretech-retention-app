@@ -1,5 +1,4 @@
 import { createClient } from '@/utils/supabase/server'
-import PrototypeNav from '@/components/ui/PrototypeNav'
 import { redirect } from 'next/navigation'
 
 export default async function AppDashboard() {
@@ -16,7 +15,6 @@ export default async function AppDashboard() {
     
   return (
     <div className="flex flex-col min-h-screen bg-[var(--color-bg)]">
-      <PrototypeNav />
       <main className="flex-1 p-6">
         <h1 className="text-2xl font-bold mb-4">Welcome to your App Dashboard</h1>
         <div className="bg-white p-4 rounded-xl shadow border border-[var(--color-border)]">

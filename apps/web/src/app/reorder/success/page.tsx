@@ -7,7 +7,6 @@ import { RotateCcw, LayoutDashboard } from "lucide-react";
 import SuccessState from "@/components/ui/SuccessState";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
-import PrototypeNav from "@/components/ui/PrototypeNav";
 
 export default function ReorderSuccessPage() {
   return (
@@ -45,7 +44,7 @@ export default function ReorderSuccessPage() {
 
           {/* Next steps */}
           <div className="space-y-3">
-            <Link href="/app/dashboard" className="block">
+            <Link href="/dashboard" className="block">
               <Button variant="primary" size="lg" fullWidth icon={<LayoutDashboard size={18} />}>
                 Go to Dashboard
               </Button>
@@ -56,7 +55,6 @@ export default function ReorderSuccessPage() {
           </div>
         </SuccessState>
       </div>
-      <PrototypeNav />
     </>
   );
 }

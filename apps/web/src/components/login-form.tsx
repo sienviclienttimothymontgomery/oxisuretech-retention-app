@@ -5,7 +5,7 @@ import { createClient } from '@/utils/supabase/client'
 import Button from '@/components/ui/Button'
 import InputField from '@/components/ui/InputField'
 
-export default function LoginForm({ type }: { type: 'app' | 'web' }) {
+export default function LoginForm({ type, redirectTo }: { type: 'app' | 'web'; redirectTo?: string }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -43,7 +43,7 @@ export default function LoginForm({ type }: { type: 'app' | 'web' }) {
       if (error) {
         setError(error.message)
       } else {
-        setMessage('Check your email for the magic link.')
+        window.location.href = '/web/check-email'
       }
     } else {
       // Password login for App
@@ -53,7 +53,7 @@ export default function LoginForm({ type }: { type: 'app' | 'web' }) {
       })
       if (error) setError(error.message)
       else {
-        window.location.href = '/app/dashboard'
+        window.location.href = redirectTo ?? '/app/dashboard'
       }
     }
     setLoading(false)

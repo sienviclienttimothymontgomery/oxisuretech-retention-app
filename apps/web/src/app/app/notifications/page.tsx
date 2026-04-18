@@ -7,7 +7,6 @@ import { Bell, Mail, ArrowRight } from "lucide-react";
 import Button from "@/components/ui/Button";
 import StepIndicator from "@/components/ui/StepIndicator";
 import Card from "@/components/ui/Card";
-import PrototypeNav from "@/components/ui/PrototypeNav";
 
 const STEPS = ["Type", "Product", "Quantity", "Alerts", "Done"];
 
@@ -106,15 +105,17 @@ export default function AppNotificationsPage() {
           </div>
         )}
 
-        <section className="mt-auto">
+        <section className="mt-auto space-y-3">
           <Link href="/app/dashboard" className="block">
             <Button variant="primary" size="lg" fullWidth icon={<ArrowRight size={20} />}>
               Complete Setup
             </Button>
           </Link>
+          <Link href="/app/quantity" className="block text-center text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors py-1">
+            ← Back
+          </Link>
         </section>
       </div>
-      <PrototypeNav />
     </>
   );
 }

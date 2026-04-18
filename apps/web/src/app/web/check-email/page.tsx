@@ -6,7 +6,6 @@ import Link from "next/link";
 import { Mail, ArrowRight } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
-import PrototypeNav from "@/components/ui/PrototypeNav";
 
 export default function WebCheckEmailPage() {
   return (
@@ -55,7 +54,6 @@ export default function WebCheckEmailPage() {
           </p>
         </div>
       </div>
-      <PrototypeNav />
     </>
   );
 }

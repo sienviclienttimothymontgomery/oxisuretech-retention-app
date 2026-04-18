@@ -5,72 +5,72 @@ import Image from "next/image";
 import Link from "next/link";
 import PathCard from "@/components/ui/PathCard";
 import Button from "@/components/ui/Button";
-import PrototypeNav from "@/components/ui/PrototypeNav";
 import { ArrowRight } from "lucide-react";
 
 export default function ChoosePathPage() {
   const [selected, setSelected] = useState<"app" | "web" | null>(null);
 
-  const nextHref = selected === "app" ? "/app/welcome" : selected === "web" ? "/web/start" : "#";
+  // App path goes to login first (Option A), web path goes directly to /web/start
+  const nextHref = selected === "app" ? "/app/login" : selected === "web" ? "/web/start" : "#";
 
   return (
-    <>
-      <div className="page-container pb-8">
-        {/* Header */}
-        <header className="flex items-center justify-center py-2">
-          <Image src="/logo.png" alt="OxiSure Tech" width={320} height={96} className="h-24 w-auto" />
-        </header>
+    <div className="page-container pb-8">
+      {/* Header */}
+      <header className="flex items-center justify-center py-2">
+        <Image src="/logo.png" alt="OxiSure Tech" width={320} height={96} className="h-24 w-auto" />
+      </header>
 
-        {/* Heading */}
-        <section className="text-center mb-4">
-          <h1 className="text-2xl font-bold text-[var(--color-text)] mb-2">
-            How Would You Like to Track?
-          </h1>
-          <p className="text-base text-[var(--color-text-secondary)]">
-            Choose the option that works best for you.
+      {/* Heading */}
+      <section className="text-center mb-4">
+        <h1 className="text-2xl font-bold text-[var(--color-text)] mb-2">
+          How Would You Like to Track?
+        </h1>
+        <p className="text-base text-[var(--color-text-secondary)]">
+          Choose the option that works best for you.
+        </p>
+      </section>
+
+      {/* Path cards */}
+      <section className="space-y-3 mb-5" role="radiogroup" aria-label="Choose tracking method">
+        <PathCard
+          path="app"
+          selected={selected === "app"}
+          onSelect={() => setSelected("app")}
+        />
+        <div className="flex items-center gap-3 px-4">
+          <div className="flex-1 border-t border-[var(--color-border)]" />
+          <span className="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider">or</span>
+          <div className="flex-1 border-t border-[var(--color-border)]" />
+        </div>
+        <PathCard
+          path="web"
+          selected={selected === "web"}
+          onSelect={() => setSelected("web")}
+        />
+      </section>
+
+      {/* CTA */}
+      <section className="mt-auto space-y-3">
+        <Link href={nextHref} className={`block ${!selected ? "pointer-events-none" : ""}`}>
+          <Button
+            variant="primary"
+            size="lg"
+            fullWidth
+            disabled={!selected}
+            icon={<ArrowRight size={20} />}
+          >
+            Continue
+          </Button>
+        </Link>
+        {selected === "web" && (
+          <p className="text-center text-xs text-[var(--color-text-muted)]">
+            You can always switch to the app later.
           </p>
-        </section>
-
-        {/* Path cards */}
-        <section className="space-y-3 mb-5" role="radiogroup" aria-label="Choose tracking method">
-          <PathCard
-            path="app"
-            selected={selected === "app"}
-            onSelect={() => setSelected("app")}
-          />
-          <div className="flex items-center gap-3 px-4">
-            <div className="flex-1 border-t border-[var(--color-border)]" />
-            <span className="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider">or</span>
-            <div className="flex-1 border-t border-[var(--color-border)]" />
-          </div>
-          <PathCard
-            path="web"
-            selected={selected === "web"}
-            onSelect={() => setSelected("web")}
-          />
-        </section>
-
-        {/* CTA */}
-        <section className="mt-auto space-y-3">
-          <Link href={nextHref} className={`block ${!selected ? "pointer-events-none" : ""}`}>
-            <Button
-              variant="primary"
-              size="lg"
-              fullWidth
-              disabled={!selected}
-              icon={<ArrowRight size={20} />}
-            >
-              Continue
-            </Button>
-          </Link>
-          {selected === "web" && (
-            <p className="text-center text-xs text-[var(--color-text-muted)]">
-              You can always switch to the app later.
-            </p>
-          )}
-        </section>
-      </div>
-      <PrototypeNav />
-    </>
+        )}
+        <Link href="/activate" className="block text-center text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors py-1">
+          ← Back
+        </Link>
+      </section>
+    </div>
   );
 }

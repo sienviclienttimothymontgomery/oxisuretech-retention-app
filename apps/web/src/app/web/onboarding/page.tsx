@@ -1,4 +1,3 @@
-import PrototypeNav from '@/components/ui/PrototypeNav'
 import Button from '@/components/ui/Button'
 import { submitWebOnboarding } from '@/app/actions'
 import { createClient } from '@/utils/supabase/server'
@@ -16,7 +15,6 @@ export default async function WebOnboarding() {
 
   return (
     <div className="flex flex-col min-h-screen bg-[var(--color-bg)]">
-      <PrototypeNav />
       <main className="flex-1 p-6">
         <h1 className="text-2xl font-bold mb-4">Just a few questions</h1>
         <p className="text-sm text-[var(--color-text-secondary)] mb-6">Let's set up your individual tracker.</p>

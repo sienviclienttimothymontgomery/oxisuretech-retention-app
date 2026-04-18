@@ -40,10 +40,10 @@ export async function submitQuantity(formData: FormData) {
 
   await supabase
     .from('profiles')
-    .update({ quantity })
+    .update({ quantity, onboarding_completed: true })
     .eq('id', user.id)
 
-  redirect('/app/dashboard') // skipped notifications step per Week 4 constraints
+  redirect('/app/dashboard')
 }
 
 export async function submitWebOnboarding(formData: FormData) {

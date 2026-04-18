@@ -8,7 +8,6 @@ import Button from "@/components/ui/Button";
 import StepIndicator from "@/components/ui/StepIndicator";
 import ProductCard from "@/components/ui/ProductCard";
 import { submitProduct } from "@/app/actions";
-import PrototypeNav from "@/components/ui/PrototypeNav";
 
 const STEPS = ["Type", "Product", "Quantity", "Done"];
 
@@ -57,9 +56,11 @@ export default function AppConfirmProductPage() {
           <Button variant="ghost" size="md" fullWidth>
             This isn&apos;t my product
           </Button>
+          <Link href="/app/user-type" className="block text-center text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors py-1">
+            ← Back
+          </Link>
         </section>
       </div>
-      <PrototypeNav />
     </>
   );
 }

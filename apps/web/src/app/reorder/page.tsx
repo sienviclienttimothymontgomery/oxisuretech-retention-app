@@ -8,7 +8,6 @@ import Button from "@/components/ui/Button";
 import ProductCard from "@/components/ui/ProductCard";
 import Card from "@/components/ui/Card";
 import StatusBadge from "@/components/ui/StatusBadge";
-import PrototypeNav from "@/components/ui/PrototypeNav";
 
 type StatusType = "on-track" | "due-soon" | "overdue" | "recovery";
 
@@ -146,7 +145,6 @@ export default function ReorderPage() {
           </p>
         </section>
       </div>
-      <PrototypeNav />
     </>
   );
 }
