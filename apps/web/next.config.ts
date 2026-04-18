@@ -4,7 +4,7 @@ import path from "node:path";
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  outputFileTracingRoot: path.join(__dirname),
+  outputFileTracingRoot: path.join(__dirname, "../../"),
   eslint: { ignoreDuringBuilds: true }
 };
 
