@@ -6,6 +6,7 @@
     "dev": "next dev",
     "prebuild": "npm install @tailwindcss/oxide-linux-x64-gnu --no-save --force",
     "build": "next build",
+    "postbuild": "node -e \"try { require('fs').cpSync('.next/standalone/apps/web/.next', '.next/standalone/.next', { recursive: true }); require('fs').copyFileSync('.next/standalone/apps/web/server.js', '.next/standalone/server.js'); } catch (e) {}\"",
     "start": "next start",
     "lint": "eslint"
   },
