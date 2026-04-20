@@ -7,6 +7,8 @@ create table public.profiles (
   product_sku text,
   quantity integer default 1,
   onboarding_completed boolean default false,
+  notifications_push boolean default true,
+  notifications_email boolean default true,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null,
   primary key (id)

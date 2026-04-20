@@ -3,7 +3,7 @@
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ScanLine, ArrowRight } from "lucide-react";
+import { PackageCheck, ArrowRight } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 
@@ -15,13 +15,13 @@ export default function ActivatePage() {
         <Image src="/logo.png" alt="OxiSure Tech" width={320} height={96} className="h-24 w-auto" />
       </header>
 
-      {/* Scan confirmation */}
+      {/* Order confirmation */}
       <section className="text-center mb-4 animate-fade-up">
         <div className="w-16 h-16 rounded-full bg-[var(--color-success-bg)] flex items-center justify-center mx-auto mb-4">
-          <ScanLine size={32} className="text-[var(--color-success)]" />
+          <PackageCheck size={32} className="text-[var(--color-success)]" />
         </div>
         <h1 className="text-2xl font-bold text-[var(--color-text)] mb-2">
-          Product Detected
+          Order Verified
         </h1>
         <p className="text-base text-[var(--color-text-secondary)]">
           We found your oxygen tubing purchase. Let&apos;s set up your replacement tracker.

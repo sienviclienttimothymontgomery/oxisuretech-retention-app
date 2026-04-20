@@ -9,7 +9,7 @@ import StepIndicator from "@/components/ui/StepIndicator";
 import ProductCard from "@/components/ui/ProductCard";
 import { submitProduct } from "@/app/actions";
 
-const STEPS = ["Type", "Product", "Quantity", "Done"];
+const STEPS = ["Type", "Product", "Quantity", "Alerts", "Done"];
 
 export default function AppConfirmProductPage() {
   return (

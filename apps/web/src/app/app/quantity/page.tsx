@@ -8,7 +8,7 @@ import Button from "@/components/ui/Button";
 import StepIndicator from "@/components/ui/StepIndicator";
 import { submitQuantity } from "@/app/actions";
 
-const STEPS = ["Type", "Product", "Quantity", "Done"];
+const STEPS = ["Type", "Product", "Quantity", "Alerts", "Done"];
 
 export default function AppQuantityPage() {
   const [quantity, setQuantity] = useState(1);
@@ -74,7 +74,7 @@ export default function AppQuantityPage() {
         <form action={submitQuantity}>
           <input type="hidden" name="quantity" value={quantity} />
           <Button type="submit" variant="primary" size="lg" fullWidth icon={<ArrowRight size={20} />}>
-            Continue to Dashboard
+            Continue to Alerts
           </Button>
         </form>
         <Link href="/app/confirm-product" className="block text-center text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors py-1">

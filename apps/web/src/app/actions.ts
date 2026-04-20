@@ -40,7 +40,24 @@ export async function submitQuantity(formData: FormData) {
 
   await supabase
     .from('profiles')
-    .update({ quantity, onboarding_completed: true })
+    .update({ quantity })
+    .eq('id', user.id)
+
+  redirect('/app/notifications')
+}
+
+export async function submitNotifications(pushEnabled: boolean, emailEnabled: boolean) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+
+  await supabase
+    .from('profiles')
+    .update({ 
+      notifications_push: pushEnabled, 
+      notifications_email: emailEnabled,
+      onboarding_completed: true 
+    })
     .eq('id', user.id)
 
   redirect('/app/dashboard')

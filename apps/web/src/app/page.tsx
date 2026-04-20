@@ -3,7 +3,7 @@
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Shield, Clock, Bell, PackageCheck, ScanLine } from "lucide-react";
+import { ArrowRight, Shield, Clock, Bell, PackageCheck, Hash } from "lucide-react";
 import Button from "@/components/ui/Button";
 
 export default function LandingPage() {
@@ -76,8 +76,8 @@ export default function LandingPage() {
           </Link>
           <Link href="/activate" className="block">
             <button className="w-full flex justify-center items-center gap-2 text-sm font-medium text-[var(--color-primary)] hover:bg-[var(--color-primary)] hover:text-white transition-colors py-3 border-2 border-dashed border-[var(--color-primary)]/30 rounded-[var(--radius-md)] bg-[var(--color-bg-subtle)] focus:outline-none">
-              <ScanLine size={18} />
-              Scan FNSKU code to verify product
+              <Hash size={18} />
+              Enter order number to verify product
             </button>
           </Link>
           <p className="text-center text-xs text-[var(--color-text-muted)]">

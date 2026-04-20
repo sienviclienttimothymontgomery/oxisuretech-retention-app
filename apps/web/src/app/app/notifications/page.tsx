@@ -8,11 +8,21 @@ import Button from "@/components/ui/Button";
 import StepIndicator from "@/components/ui/StepIndicator";
 import Card from "@/components/ui/Card";
 
+import { submitNotifications } from "@/app/actions";
+
 const STEPS = ["Type", "Product", "Quantity", "Alerts", "Done"];
 
 export default function AppNotificationsPage() {
   const [pushEnabled, setPushEnabled] = useState(true);
   const [emailEnabled, setEmailEnabled] = useState(true);
+  const [isPending, setIsPending] = React.useTransition()[0];
+  const startTransition = React.useTransition()[1];
+
+  const handleComplete = () => {
+    startTransition(async () => {
+      await submitNotifications(pushEnabled, emailEnabled);
+    });
+  };
 
   return (
     <>
@@ -106,11 +116,16 @@ export default function AppNotificationsPage() {
         )}
 
         <section className="mt-auto space-y-3">
-          <Link href="/app/dashboard" className="block">
-            <Button variant="primary" size="lg" fullWidth icon={<ArrowRight size={20} />}>
-              Complete Setup
-            </Button>
-          </Link>
+          <Button 
+            variant="primary" 
+            size="lg" 
+            fullWidth 
+            icon={<ArrowRight size={20} />}
+            onClick={handleComplete}
+            disabled={isPending}
+          >
+            {isPending ? "Setting up..." : "Complete Setup"}
+          </Button>
           <Link href="/app/quantity" className="block text-center text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors py-1">
             ← Back
           </Link>
