@@ -15,8 +15,7 @@ const STEPS = ["Type", "Product", "Quantity", "Alerts", "Done"];
 export default function AppNotificationsPage() {
   const [pushEnabled, setPushEnabled] = useState(true);
   const [emailEnabled, setEmailEnabled] = useState(true);
-  const [isPending, setIsPending] = React.useTransition()[0];
-  const startTransition = React.useTransition()[1];
+  const [isPending, startTransition] = React.useTransition();
 
   const handleComplete = () => {
     startTransition(async () => {
