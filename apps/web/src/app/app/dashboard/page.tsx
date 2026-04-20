@@ -12,6 +12,10 @@ export default async function AppDashboard() {
     .select('*')
     .eq('id', user.id)
     .single()
+  
+  if (!profile?.onboarding_completed) {
+    return redirect('/app/user-type')
+  }
     
   return (
     <div className="flex flex-col min-h-screen bg-[var(--color-bg)]">

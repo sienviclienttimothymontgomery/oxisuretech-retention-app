@@ -39,6 +39,7 @@ export async function updateSession(request: NextRequest) {
                           request.nextUrl.pathname.startsWith('/app/quantity')
   
   const isWebDashboard = request.nextUrl.pathname.startsWith('/web/dashboard')
+  const isWebOnboarding = request.nextUrl.pathname.startsWith('/web/onboarding')
   const isWebStart = request.nextUrl.pathname === '/web/start'
   const isWebEmail = request.nextUrl.pathname === '/web/check-email'
 
@@ -52,10 +53,23 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  if (!user && isWebDashboard) {
+  if (!user && (isWebDashboard || isWebOnboarding)) {
     // protect web routes
     const url = request.nextUrl.clone()
     url.pathname = '/web/start'
+    return NextResponse.redirect(url)
+  }
+
+  // Root redirection for authenticated users
+  if (user && request.nextUrl.pathname === '/') {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('path_type')
+      .eq('id', user.id)
+      .single()
+    
+    const url = request.nextUrl.clone()
+    url.pathname = profile?.path_type === 'web' ? '/web/dashboard' : '/app/dashboard'
     return NextResponse.redirect(url)
   }
 
