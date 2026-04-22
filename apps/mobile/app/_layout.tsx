@@ -7,7 +7,9 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AuthProvider } from '@/providers/AuthProvider';
 
 export default function RootLayout() {
+  console.log('[BOOT] RootLayout mounting...');
   const colorScheme = useColorScheme();
+  console.log('[BOOT] Color scheme:', colorScheme);
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
