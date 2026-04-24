@@ -6,7 +6,7 @@ export default async function DashboardRedirect() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) return redirect('/choose-path')
+  if (!user) return redirect('/')
 
   const { data: profile } = await supabase
     .from('profiles')

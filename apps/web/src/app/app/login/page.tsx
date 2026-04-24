@@ -14,7 +14,7 @@ export default function AppLogin() {
       </div>
       <LoginForm type="app" redirectTo="/app/user-type" />
       <Link
-        href="/choose-path"
+        href="/"
         className="block text-center text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors py-1 mt-4"
       >
         ← Back

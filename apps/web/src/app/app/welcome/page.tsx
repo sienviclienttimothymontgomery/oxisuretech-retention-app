@@ -34,7 +34,7 @@ export default function AppWelcomePage() {
               Let&apos;s Get Started
             </Button>
           </Link>
-          <Link href="/choose-path" className="block text-center text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors py-1">
+          <Link href="/" className="block text-center text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors py-1">
             ← Back
           </Link>
         </div>

@@ -63,14 +63,12 @@ export default function ActivatePage() {
 
       {/* CTA */}
       <section className="mt-auto space-y-3">
-        <Link href="/choose-path" className="block">
+        <Link href="/" className="block">
           <Button variant="primary" size="lg" fullWidth icon={<ArrowRight size={20} />}>
             Set Up My Tracker
           </Button>
         </Link>
-        <Link href="/" className="block text-center text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors py-1">
-          ← Back
-        </Link>
+
       </section>
     </div>
   );
