@@ -15,7 +15,12 @@ export default async function WebOnboarding() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return redirect('/web/start')
 
-  const { data: profile } = await supabase.from('profiles').select('onboarding_completed').eq('id', user.id).single()
+  const { data: profile } = await supabase.from('profiles').select('onboarding_completed, path_type').eq('id', user.id).single()
+  
+  if (profile?.path_type === 'app') {
+    return redirect('/app/dashboard')
+  }
+
   if (profile?.onboarding_completed) {
     return redirect('/web/dashboard')
   }

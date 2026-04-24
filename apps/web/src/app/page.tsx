@@ -64,23 +64,25 @@ export default function LandingPage() {
 
         {/* CTA */}
         <section className="space-y-3 mt-auto">
-          <Link href="/activate" className="block">
+          <Link href="/app/login" className="block">
             <Button
               variant="primary"
               size="lg"
               fullWidth
-              icon={<ArrowRight size={20} />}
             >
-              Get Started
+              Download the App
             </Button>
           </Link>
-          <Link href="/activate" className="block">
-            <button className="w-full flex justify-center items-center gap-2 text-sm font-medium text-[var(--color-primary)] hover:bg-[var(--color-primary)] hover:text-white transition-colors py-3 border-2 border-dashed border-[var(--color-primary)]/30 rounded-[var(--radius-md)] bg-[var(--color-bg-subtle)] focus:outline-none">
-              <Hash size={18} />
-              Enter order number to verify product
-            </button>
+          <Link href="/web/start" className="block">
+            <Button
+              variant="secondary"
+              size="lg"
+              fullWidth
+            >
+              Use Web Tracker
+            </Button>
           </Link>
-          <p className="text-center text-xs text-[var(--color-text-muted)]">
+          <p className="text-center text-xs text-[var(--color-text-muted)] mt-4">
             Free to use. No credit card required.
           </p>
         </section>

@@ -17,6 +17,10 @@ export default async function WebDashboard() {
     .eq('id', user.id)
     .single()
 
+  if (profile?.path_type === 'app') {
+    return redirect('/app/dashboard')
+  }
+
   if (!profile?.onboarding_completed) {
     return redirect('/web/onboarding')
   }
@@ -88,10 +92,12 @@ export default async function WebDashboard() {
 
       {/* Logout Action */}
       <div className="mt-auto pt-8">
-        <button className="w-full flex items-center justify-center gap-2 text-sm font-medium text-[var(--color-danger)] py-3 hover:bg-[var(--color-danger-bg)] rounded-[var(--radius-md)] transition-colors">
-          <LogOut size={18} />
-          Sign Out of Tracker
-        </button>
+        <form action="/auth/signout" method="post">
+          <button type="submit" className="w-full flex items-center justify-center gap-2 text-sm font-medium text-[var(--color-danger)] py-3 hover:bg-[var(--color-danger-bg)] rounded-[var(--radius-md)] transition-colors">
+            <LogOut size={18} />
+            Sign Out of Tracker
+          </button>
+        </form>
       </div>
     </div>
   )

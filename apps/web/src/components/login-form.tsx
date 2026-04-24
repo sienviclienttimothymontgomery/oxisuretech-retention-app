@@ -41,7 +41,11 @@ export default function LoginForm({ type, redirectTo }: { type: 'app' | 'web'; r
         },
       })
       if (error) {
-        setError(error.message)
+        if (error.message.toLowerCase().includes('rate limit') || error.status === 429) {
+          setError('Too many requests. Please wait a moment before trying again.')
+        } else {
+          setError(error.message)
+        }
       } else {
         window.location.href = '/web/check-email'
       }

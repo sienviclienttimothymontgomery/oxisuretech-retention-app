@@ -13,6 +13,10 @@ export default async function AppDashboard() {
     .eq('id', user.id)
     .single()
   
+  if (profile?.path_type === 'web') {
+    return redirect('/web/dashboard')
+  }
+
   if (!profile?.onboarding_completed) {
     return redirect('/app/user-type')
   }

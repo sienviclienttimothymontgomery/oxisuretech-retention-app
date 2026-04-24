@@ -60,8 +60,14 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Root redirection for authenticated users
-  if (user && request.nextUrl.pathname === '/') {
+  const isStarterRoute = request.nextUrl.pathname === '/' || 
+                         request.nextUrl.pathname === '/app/welcome' || 
+                         request.nextUrl.pathname === '/app/login' || 
+                         isWebStart || 
+                         isWebEmail
+
+  // Root redirection for authenticated users trying to access starter pages
+  if (user && isStarterRoute) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('path_type')

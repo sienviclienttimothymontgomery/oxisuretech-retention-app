@@ -73,13 +73,13 @@ export async function submitWebOnboarding(formData: FormData) {
 
   await supabase
     .from('profiles')
-    .upsert({ 
-      id: user.id, 
+    .update({ 
       user_type: userType, 
       quantity, 
       path_type: 'web',
       onboarding_completed: true 
     })
+    .eq('id', user.id)
 
   redirect('/web/dashboard')
 }
