@@ -7,6 +7,7 @@ import { PackageCheck, ArrowRight, Loader2, ShieldCheck, Search } from "lucide-r
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import { createClient } from "@/utils/supabase/client";
+import { completeOrderVerification } from "@/app/actions";
 
 export default function ActivatePage() {
   const [orderId, setOrderId] = useState("");
@@ -152,14 +153,13 @@ export default function ActivatePage() {
           ))}
         </div>
       </section>
-
       {/* CTA */}
       <section className="mt-auto space-y-3 animate-fade-up" style={{ animationDelay: '300ms' }}>
-        <Link href="/" className="block">
-          <Button variant="primary" size="lg" fullWidth icon={<ArrowRight size={20} />}>
+        <form action={completeOrderVerification} className="block">
+          <Button type="submit" variant="primary" size="lg" fullWidth icon={<ArrowRight size={20} />}>
             Set Up My Tracker
           </Button>
-        </Link>
+        </form>
       </section>
     </div>
   );

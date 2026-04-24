@@ -104,3 +104,16 @@ export async function completeOnboarding() {
   revalidatePath('/app/dashboard')
   redirect('/app/dashboard')
 }
+
+export async function completeOrderVerification() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return redirect('/web/start')
+
+  await supabase
+    .from('profiles')
+    .upsert({ id: user.id, order_verified: true })
+    
+  revalidatePath('/web/dashboard')
+  redirect('/web/onboarding')
+}

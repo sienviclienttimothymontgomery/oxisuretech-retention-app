@@ -21,6 +21,11 @@ export default async function WebDashboard() {
     return redirect('/app/dashboard')
   }
 
+  // Force order verification before allowing them into the dashboard or onboarding
+  if (!profile?.order_verified) {
+    return redirect('/activate')
+  }
+
   if (!profile?.onboarding_completed) {
     return redirect('/web/onboarding')
   }
