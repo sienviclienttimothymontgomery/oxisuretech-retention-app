@@ -33,18 +33,19 @@ export default function LoginForm({ type, redirectTo }: { type: 'app' | 'web'; r
     setMessage(null)
 
     if (type === 'web') {
-      // Magic link for Web Tracker via custom Edge Function to bypass rate limits
-      const { error, data } = await supabase.functions.invoke('send-magic-link', {
-        body: { 
-          email, 
-          redirectTo: `${window.location.origin}/auth/callback?next=/web/dashboard` 
-        }
+      // Magic link for Web Tracker
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=/web/dashboard`,
+        },
       })
-      
       if (error) {
-        setError(error.message || 'Failed to invoke function')
-      } else if (data?.error) {
-        setError(data.error)
+        if (error.message.toLowerCase().includes('rate limit') || error.status === 429) {
+          setError('Too many requests. Please wait a moment before trying again.')
+        } else {
+          setError(error.message)
+        }
       } else {
         window.location.href = '/web/check-email'
       }
