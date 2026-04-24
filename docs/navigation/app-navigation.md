@@ -81,7 +81,7 @@ For QR code activation flow:
 - `oxisure://reorder` → Opens reorder tab directly
 - `oxisure://dashboard` → Opens dashboard
 
-Fallback: Universal Links via `https://app.oxisuretech.com/activate`
+Fallback: Universal Links via `https://app.oxisuretechsolutions.com/activate`
 
 ## State Management Notes
 

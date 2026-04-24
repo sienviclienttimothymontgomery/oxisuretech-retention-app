@@ -32,6 +32,19 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
+  // Handle Magic Link error redirects from Supabase
+  if (request.nextUrl.searchParams.has('error')) {
+    const errorCode = request.nextUrl.searchParams.get('error_code');
+    const errorDesc = request.nextUrl.searchParams.get('error_description');
+    
+    if (errorCode === 'otp_expired' || errorDesc?.includes('invalid')) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/auth/auth-code-error';
+      url.search = ''; // Clear search params
+      return NextResponse.redirect(url);
+    }
+  }
+
   // ROUTE PROTECTION LOGIC
   const isAppDashboard = request.nextUrl.pathname.startsWith('/app/dashboard')
   const isAppOnboarding = request.nextUrl.pathname.startsWith('/app/user-type') || 

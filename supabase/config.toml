@@ -151,9 +151,9 @@ max_indexes = 5
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
-site_url = "http://localhost:3000"
+site_url = "https://oxisuretechsolutions.com"
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = []
+additional_redirect_urls = ["http://localhost:3000/auth/callback", "https://oxisuretechsolutions.com/auth/callback", "https://app.oxisuretechsolutions.com/auth/callback"]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to the local API URL (http://127.0.0.1:<port>/auth/v1).
@@ -233,10 +233,14 @@ host = "smtp.resend.com"
 port = 465
 user = "resend"
 pass = "env(RESEND_API_KEY)"
-admin_email = "system@oxisuretech.com"
+admin_email = "system@oxisuretechsolutions.com"
 sender_name = "OxiSure Tech Tracker"
 
-# Uncomment to customize email template
+# Customize email templates
+[auth.email.template.magic_link]
+subject = "Your Magic Link - OxiSure Tech"
+content_path = "./supabase/templates/magic_link.html"
+
 # [auth.email.template.invite]
 # subject = "You have been invited"
 # content_path = "./supabase/templates/invite.html"

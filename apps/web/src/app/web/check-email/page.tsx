@@ -42,15 +42,12 @@ export default function WebCheckEmailPage() {
           </div>
         </Card>
 
-        {/* Prototype skip for demo */}
-        <div className="w-full space-y-3">
-          <Link href="/web/dashboard" className="block">
-            <Button variant="primary" size="lg" fullWidth icon={<ArrowRight size={20} />}>
-              Continue to Dashboard
-            </Button>
-          </Link>
-          <p className="text-xs text-[var(--color-text-muted)]">
-            Didn&apos;t get it? Check spam or request a new link.
+        <div className="w-full mt-6">
+          <p className="text-sm text-[var(--color-text-muted)]">
+            Didn&apos;t get it? Check spam or{" "}
+            <Link href="/web/start" className="text-[var(--color-primary)] hover:underline">
+              request a new link
+            </Link>.
           </p>
         </div>
       </div>

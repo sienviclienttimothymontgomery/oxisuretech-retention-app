@@ -36,7 +36,7 @@ export default function AuthCodeError() {
       </Card>
       
       <p className="text-center text-xs text-[var(--color-text-muted)] mt-auto pt-4">
-        Need help? Contact support@oxisuretech.com
+        Need help? Contact support@oxisuretechsolutions.com
       </p>
     </div>
   )
