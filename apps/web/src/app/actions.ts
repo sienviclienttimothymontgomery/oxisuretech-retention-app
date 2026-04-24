@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
+import { revalidatePath } from 'next/cache'
 
 export async function submitUserType(formData: FormData) {
   const userType = formData.get('userType') as string
@@ -60,6 +61,7 @@ export async function submitNotifications(pushEnabled: boolean, emailEnabled: bo
     })
     .eq('id', user.id)
 
+  revalidatePath('/app/dashboard')
   redirect('/app/dashboard')
 }
 
@@ -73,14 +75,15 @@ export async function submitWebOnboarding(formData: FormData) {
 
   await supabase
     .from('profiles')
-    .update({ 
+    .upsert({ 
+      id: user.id,
       user_type: userType, 
       quantity, 
       path_type: 'web',
       onboarding_completed: true 
     })
-    .eq('id', user.id)
 
+  revalidatePath('/web/dashboard')
   redirect('/web/dashboard')
 }
 
@@ -94,5 +97,6 @@ export async function completeOnboarding() {
     .update({ onboarding_completed: true })
     .eq('id', user.id)
     
+  revalidatePath('/app/dashboard')
   redirect('/app/dashboard')
 }
