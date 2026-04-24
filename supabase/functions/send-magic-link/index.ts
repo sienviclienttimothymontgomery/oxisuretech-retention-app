@@ -21,7 +21,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Email is required" }), { status: 400, headers: { "Access-Control-Allow-Origin": "*" } })
     }
 
-    const redirectUrl = redirectTo || 'https://oxisuretechsolutions.com/auth/callback?next=/web/dashboard'
+    const redirectUrl = redirectTo || 'https://oxisuretech-retention-app--oxisuretech-retention-app.us-east4.hosted.app/auth/verify-hash?next=/web/dashboard'
 
     // Initialize Supabase admin client
     const supabaseAdmin = createClient(
