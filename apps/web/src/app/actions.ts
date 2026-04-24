@@ -117,3 +117,23 @@ export async function completeOrderVerification() {
   revalidatePath('/web/dashboard')
   redirect('/web/onboarding')
 }
+
+export async function updateWebSettings(formData: FormData) {
+  const quantity = parseInt(formData.get('quantity') as string) || 1
+  
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return redirect('/web/start')
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ quantity })
+    .eq('id', user.id)
+
+  if (error) {
+    redirect(`/web/settings?error=${encodeURIComponent(error.message)}`)
+  }
+
+  revalidatePath('/web/dashboard')
+  redirect('/web/settings?success=1')
+}
