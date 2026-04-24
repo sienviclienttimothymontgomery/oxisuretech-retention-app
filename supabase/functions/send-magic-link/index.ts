@@ -15,11 +15,13 @@ serve(async (req) => {
   }
 
   try {
-    const { email } = await req.json()
+    const { email, redirectTo } = await req.json()
     
     if (!email) {
       return new Response(JSON.stringify({ error: "Email is required" }), { status: 400, headers: { "Access-Control-Allow-Origin": "*" } })
     }
+
+    const redirectUrl = redirectTo || 'https://oxisuretechsolutions.com/auth/callback?next=/web/dashboard'
 
     // Initialize Supabase admin client
     const supabaseAdmin = createClient(
@@ -32,7 +34,7 @@ serve(async (req) => {
       type: 'magiclink',
       email: email,
       options: {
-        redirectTo: 'https://oxisuretechsolutions.com/auth/callback?next=/web/dashboard'
+        redirectTo: redirectUrl
       }
     })
 

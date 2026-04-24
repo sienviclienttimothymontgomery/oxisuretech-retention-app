@@ -35,7 +35,10 @@ export default function LoginForm({ type, redirectTo }: { type: 'app' | 'web'; r
     if (type === 'web') {
       // Magic link for Web Tracker via custom Edge Function to bypass rate limits
       const { error, data } = await supabase.functions.invoke('send-magic-link', {
-        body: { email }
+        body: { 
+          email, 
+          redirectTo: `${window.location.origin}/auth/callback?next=/web/dashboard` 
+        }
       })
       
       if (error) {
