@@ -73,7 +73,7 @@ export async function submitWebOnboarding(formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return
 
-  await supabase
+  const { error } = await supabase
     .from('profiles')
     .upsert({ 
       id: user.id,
@@ -82,6 +82,10 @@ export async function submitWebOnboarding(formData: FormData) {
       path_type: 'web',
       onboarding_completed: true 
     })
+
+  if (error) {
+    redirect(`/web/onboarding?error=${encodeURIComponent(error.message)}`)
+  }
 
   revalidatePath('/web/dashboard')
   redirect('/web/dashboard')

@@ -10,7 +10,10 @@ import { ArrowRight, PackageCheck } from "lucide-react";
 
 const STEPS = ["Start", "Setup", "Track"];
 
-export default async function WebOnboarding() {
+export default async function WebOnboarding({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+  const resolvedParams = await searchParams;
+  const errorMsg = resolvedParams.error;
+  
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return redirect('/web/start')
@@ -32,6 +35,13 @@ export default async function WebOnboarding() {
       </header>
 
       <StepIndicator steps={STEPS} currentStep={1} />
+
+      {errorMsg && (
+        <div className="mb-6 p-4 rounded-[var(--radius-md)] bg-red-50 border border-red-200 text-red-600 text-sm">
+          <p className="font-semibold mb-1">Failed to save profile</p>
+          <p>{errorMsg}</p>
+        </div>
+      )}
 
       <section className="mb-4 animate-fade-up">
         <h1 className="text-xl font-bold text-[var(--color-text)] mb-2">
