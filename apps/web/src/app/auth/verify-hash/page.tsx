@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { Loader2 } from "lucide-react";
 import Image from "next/image";
 
-export default function VerifyHashPage() {
+function VerifyHashContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
@@ -66,20 +66,35 @@ export default function VerifyHashPage() {
   }, [router, searchParams, supabase.auth]);
 
   return (
+    <div className="flex flex-col items-center justify-center space-y-4 animate-fade-up">
+      <Loader2 size={40} className="animate-spin text-[var(--color-primary)]" />
+      <h1 className="text-xl font-semibold text-[var(--color-text)]">
+        {status}
+      </h1>
+      <p className="text-sm text-[var(--color-text-secondary)]">
+        Please wait a moment while we securely log you in.
+      </p>
+    </div>
+  );
+}
+
+export default function VerifyHashPage() {
+  return (
     <div className="page-container justify-center pb-8 items-center text-center">
       <header className="flex items-center justify-center py-2 mb-8">
         <Image src="/logo.png" alt="OxiSure Tech" width={320} height={96} className="h-24 w-auto" />
       </header>
       
-      <div className="flex flex-col items-center justify-center space-y-4 animate-fade-up">
-        <Loader2 size={40} className="animate-spin text-[var(--color-primary)]" />
-        <h1 className="text-xl font-semibold text-[var(--color-text)]">
-          {status}
-        </h1>
-        <p className="text-sm text-[var(--color-text-secondary)]">
-          Please wait a moment while we securely log you in.
-        </p>
-      </div>
+      <Suspense fallback={
+        <div className="flex flex-col items-center justify-center space-y-4 animate-fade-up">
+          <Loader2 size={40} className="animate-spin text-[var(--color-primary)]" />
+          <h1 className="text-xl font-semibold text-[var(--color-text)]">
+            Loading...
+          </h1>
+        </div>
+      }>
+        <VerifyHashContent />
+      </Suspense>
     </div>
   );
 }
