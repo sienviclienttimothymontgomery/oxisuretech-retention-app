@@ -7,6 +7,7 @@ interface CardProps {
   hoverable?: boolean;
   bordered?: boolean;
   onClick?: () => void;
+  style?: React.CSSProperties;
 }
 
 const paddings = {
@@ -22,11 +23,13 @@ export default function Card({
   hoverable = false,
   bordered = false,
   onClick,
+  style,
 }: CardProps) {
   const Tag = onClick ? "button" : "div";
   return (
     <Tag
       onClick={onClick}
+      style={style}
       className={`
         rounded-[var(--radius-md)] bg-[var(--color-surface)]
         shadow-[var(--shadow-card)]
