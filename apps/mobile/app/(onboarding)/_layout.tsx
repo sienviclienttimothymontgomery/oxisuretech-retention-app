@@ -1,14 +1,6 @@
-import { Stack } from 'expo-router';
+import React from 'react';
+import { Outlet } from 'react-router-dom';
 
 export default function OnboardingLayout() {
-  return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="welcome" />
-      <Stack.Screen name="index" />
-      <Stack.Screen name="confirm-product" />
-      <Stack.Screen name="quantity" />
-      <Stack.Screen name="notifications" />
-    </Stack>
-  );
+  return <Outlet />;
 }
-

@@ -6,9 +6,9 @@
 export const Colors = {
   light: {
     // Brand
-    primary: '#1B365D',
-    primaryLight: '#2A4A7F',
-    primaryDark: '#0F1F3D',
+    primary: '#0C5A8A', // OxiSure Teal-Blue
+    primaryLight: '#2C7BAF',
+    primaryDark: '#083F61',
     accent: '#0EA5E9',
     accentLight: '#38BDF8',
     accentDark: '#0284C7',
@@ -24,59 +24,73 @@ export const Colors = {
     infoBg: '#F0F9FF',
 
     // Surfaces
-    bg: '#FFFFFF',
+    bg: '#F5F7FA', // Light gray base
     bgSubtle: '#F8FAFC',
-    bgMuted: '#F1F5F9',
+    bgMuted: '#E2E8F0',
+    surface: '#FFFFFF', // White cards
+    surfaceRaised: '#FFFFFF',
+    border: '#E2E8F0',
+    borderSubtle: '#F1F5F9',
+
+    // Text
+    text: '#1A1A2E', // Dark gray
+    textSecondary: '#475569',
+    textMuted: '#94A3B8',
+    textInverse: '#FFFFFF',
+
+    // Gradient (Fallback, but mostly using solid colors now)
+    gradientStart: '#F5F7FA',
+    gradientMid: '#FFFFFF',
+    gradientEnd: '#F5F7FA',
+
+    // Aliases for Expo template compatibility
+    background: '#F5F7FA',
+    icon: '#475569',
+    tint: '#0C5A8A',
+  },
+  dark: {
+    // Brand (Forced Light Theme)
+    primary: '#0C5A8A',
+    primaryLight: '#2C7BAF',
+    primaryDark: '#083F61',
+    accent: '#0EA5E9',
+    accentLight: '#38BDF8',
+    accentDark: '#0284C7',
+
+    // Status
+    success: '#16A34A',
+    successBg: '#F0FDF4',
+    warning: '#D97706',
+    warningBg: '#FFFBEB',
+    danger: '#DC2626',
+    dangerBg: '#FEF2F2',
+    info: '#0EA5E9',
+    infoBg: '#F0F9FF',
+
+    // Surfaces
+    bg: '#F5F7FA',
+    bgSubtle: '#F8FAFC',
+    bgMuted: '#E2E8F0',
     surface: '#FFFFFF',
     surfaceRaised: '#FFFFFF',
     border: '#E2E8F0',
     borderSubtle: '#F1F5F9',
 
     // Text
-    text: '#0F172A',
+    text: '#1A1A2E',
     textSecondary: '#475569',
     textMuted: '#94A3B8',
     textInverse: '#FFFFFF',
 
+    // Gradient
+    gradientStart: '#F5F7FA',
+    gradientMid: '#FFFFFF',
+    gradientEnd: '#F5F7FA',
+
     // Aliases for Expo template compatibility
-    background: '#FFFFFF',
+    background: '#F5F7FA',
     icon: '#475569',
-    tint: '#1B365D',
-  },
-  dark: {
-    primary: '#93C5FD',
-    primaryLight: '#BFDBFE',
-    primaryDark: '#60A5FA',
-    accent: '#38BDF8',
-    accentLight: '#7DD3FC',
-    accentDark: '#0EA5E9',
-
-    success: '#4ADE80',
-    successBg: '#052E16',
-    warning: '#FBBF24',
-    warningBg: '#422006',
-    danger: '#F87171',
-    dangerBg: '#450A0A',
-    info: '#38BDF8',
-    infoBg: '#0C4A6E',
-
-    bg: '#0B1120',
-    bgSubtle: '#111827',
-    bgMuted: '#1E293B',
-    surface: '#1E293B',
-    surfaceRaised: '#273449',
-    border: '#334155',
-    borderSubtle: '#1E293B',
-
-    text: '#F1F5F9',
-    textSecondary: '#94A3B8',
-    textMuted: '#64748B',
-    textInverse: '#0F172A',
-
-    // Aliases for Expo template compatibility
-    background: '#0B1120',
-    icon: '#94A3B8',
-    tint: '#93C5FD',
+    tint: '#0C5A8A',
   },
 };
 
@@ -108,4 +122,35 @@ export const Typography = {
   small: { fontSize: 14, fontWeight: '400' as const, lineHeight: 20 },
   caption: { fontSize: 13, fontWeight: '400' as const, lineHeight: 18 },
   label: { fontSize: 14, fontWeight: '600' as const, lineHeight: 18, letterSpacing: 0.2 },
+} as const;
+
+export const Shadows = {
+  sm: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  md: {
+    shadowColor: '#1A1A2E',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  lg: {
+    shadowColor: '#1A1A2E',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  glow: (color: string) => ({
+    shadowColor: color,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 6,
+  }),
 } as const;

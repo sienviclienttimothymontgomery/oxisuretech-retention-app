@@ -1,13 +1,9 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  ActivityIndicator,
+  View, Text, TouchableOpacity, StyleSheet, ActivityIndicator,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/providers/AuthProvider';
 import { supabase } from '@/lib/supabase';
 import { Colors, Spacing, Radii, Typography } from '@/constants/theme';
@@ -16,206 +12,105 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 const STEPS = ['Type', 'Product', 'Quantity', 'Done'];
 
 export default function QuantityScreen() {
-  const router = useRouter();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(false);
 
   const handleContinue = async () => {
     if (!user) return;
     setLoading(true);
-
-    await supabase
-      .from('profiles')
-      .update({ quantity })
-      .eq('id', user.id);
-
-    await supabase
-      .from('profiles')
-      .update({ onboarding_completed: true })
-      .eq('id', user.id);
-
+    await supabase.from('profiles').update({ quantity }).eq('id', user.id);
+    await supabase.from('profiles').update({ onboarding_completed: true }).eq('id', user.id);
     setLoading(false);
-    router.push('/(onboarding)/notifications');
+    navigate('/(onboarding)/notifications');
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
-      <View style={styles.content}>
-        {/* Step Indicator */}
-        <View style={styles.stepRow}>
+    <View style={s.container}>
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.bg }]} />
+
+      <View style={s.content}>
+        {/* Steps */}
+        <View style={s.stepRow}>
           {STEPS.map((step, i) => (
-            <View key={step} style={styles.stepItem}>
-              <View
-                style={[
-                  styles.stepDot,
-                  {
-                    backgroundColor: i <= 2 ? colors.primary : colors.bgMuted,
-                  },
-                ]}
-              >
-                {i < 2 ? (
-                  <Text style={[Typography.caption, { color: colors.textInverse }]}>✓</Text>
-                ) : (
-                  <Text
-                    style={[
-                      Typography.caption,
-                      { color: i === 2 ? colors.textInverse : colors.textMuted },
-                    ]}
-                  >
-                    {i + 1}
-                  </Text>
-                )}
+            <View key={step} style={s.stepItem}>
+              <View style={[s.stepDot, {
+                backgroundColor: i <= 2 ? '#0EA5E9' : '#E2E8F0',
+                borderWidth: i > 2 ? 1 : 0, borderColor: '#CBD5E1',
+              }]}>
+                {i < 2
+                  ? <Text style={{ fontSize: 13, color: '#FFF', fontWeight: '600' }}>✓</Text>
+                  : <Text style={[Typography.caption, { color: i <= 2 ? '#FFF' : '#94A3B8' }]}>{i + 1}</Text>}
               </View>
-              <Text
-                style={[
-                  Typography.caption,
-                  {
-                    color: i <= 2 ? colors.primary : colors.textMuted,
-                    marginTop: 4,
-                    fontWeight: i === 2 ? '600' : '400',
-                  },
-                ]}
-              >
-                {step}
-              </Text>
+              <Text style={[Typography.caption, {
+                color: i <= 2 ? '#0C5A8A' : '#94A3B8',
+                marginTop: 4, fontWeight: i === 2 ? '600' : '400',
+              }]}>{step}</Text>
             </View>
           ))}
         </View>
 
-        {/* Heading */}
-        <View style={styles.heading}>
-          <Text style={[Typography.h2, { color: colors.text }]}>How Many Do You Use?</Text>
-          <Text style={[Typography.small, { color: colors.textSecondary, marginTop: Spacing.xs }]}>
-            This helps us calculate your replacement schedule accurately.
-          </Text>
+        <View style={s.heading}>
+          <Text style={s.title}>How Many Do You Use?</Text>
+          <Text style={s.sub}>This helps us calculate your replacement schedule accurately.</Text>
         </View>
 
-        {/* Quantity Stepper */}
-        <View style={styles.stepperSection}>
-          <Text style={[Typography.small, { color: colors.textSecondary, fontWeight: '500', marginBottom: Spacing.md }]}>
-            Tubes replaced per cycle
-          </Text>
-          <View style={styles.stepperRow}>
-            <TouchableOpacity
-              style={[styles.stepperButton, { borderColor: colors.border }]}
-              onPress={() => setQuantity(Math.max(1, quantity - 1))}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.stepperIcon, { color: colors.textSecondary }]}>−</Text>
+        {/* Stepper */}
+        <View style={s.stepperSection}>
+          <Text style={s.stepperLabel}>Tubes replaced per cycle</Text>
+          <View style={s.stepperRow}>
+            <TouchableOpacity style={s.stepperBtn} onPress={() => setQuantity(Math.max(1, quantity - 1))} activeOpacity={0.7}>
+              <Text style={s.stepperIcon}>−</Text>
             </TouchableOpacity>
-
-            <Text style={[styles.quantityText, { color: colors.text }]}>{quantity}</Text>
-
-            <TouchableOpacity
-              style={[styles.stepperButton, { borderColor: colors.border }]}
-              onPress={() => setQuantity(Math.min(10, quantity + 1))}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.stepperIcon, { color: colors.textSecondary }]}>+</Text>
+            <Text style={s.qtyText}>{quantity}</Text>
+            <TouchableOpacity style={s.stepperBtn} onPress={() => setQuantity(Math.min(10, quantity + 1))} activeOpacity={0.7}>
+              <Text style={s.stepperIcon}>+</Text>
             </TouchableOpacity>
           </View>
-          <Text style={[Typography.caption, { color: colors.textMuted, marginTop: Spacing.md }]}>
-            Most users replace {quantity === 1 ? '1 tube' : `${quantity} tubes`} every 30 days
-          </Text>
+          <Text style={s.hint}>Most users replace {quantity === 1 ? '1 tube' : `${quantity} tubes`} every 30 days</Text>
         </View>
 
-        {/* Info Box (conditional) */}
         {quantity > 1 && (
-          <View style={[styles.infoBox, { backgroundColor: colors.infoBg }]}>
-            <Text style={[Typography.small, { color: colors.info }]}>
-              We'll track all <Text style={{ fontWeight: '700' }}>{quantity} tubes</Text> on the same
-              30-day cycle for easy reordering.
-            </Text>
+          <View style={s.infoBox}>
+            <Text style={s.infoText}>We'll track all <Text style={{ fontWeight: '700' }}>{quantity} tubes</Text> on the same 30-day cycle for easy reordering.</Text>
           </View>
         )}
 
-        {/* CTA */}
-        <View style={styles.ctaContainer}>
-          <TouchableOpacity
-            style={[
-              styles.primaryButton,
-              { backgroundColor: colors.primary, opacity: loading ? 0.7 : 1 },
-            ]}
-            onPress={handleContinue}
-            disabled={loading}
-            activeOpacity={0.85}
-          >
-            {loading ? (
-              <ActivityIndicator color={colors.textInverse} />
-            ) : (
-              <Text style={[Typography.bodyMedium, { color: colors.textInverse }]}>
-                Continue to Dashboard →
-              </Text>
-            )}
+        <View style={s.cta}>
+          <TouchableOpacity style={[s.btn, { opacity: loading ? 0.7 : 1 }]} onPress={handleContinue} disabled={loading} activeOpacity={0.85}>
+            <LinearGradient colors={['#38BDF8', '#0EA5E9', '#0284C7']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.btnGrad}>
+              {loading ? <ActivityIndicator color="#FFF" /> : <Text style={s.btnText}>Continue to Dashboard →</Text>}
+            </LinearGradient>
           </TouchableOpacity>
         </View>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   container: { flex: 1 },
-  content: { flex: 1, paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg },
-  stepRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: Spacing.lg,
-    marginBottom: Spacing.xl,
-  },
+  content: { flex: 1, paddingHorizontal: Spacing.lg, paddingTop: Spacing.xxl },
+  stepRow: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.lg, marginBottom: Spacing.xl, paddingTop: Spacing.lg },
   stepItem: { alignItems: 'center' },
-  stepDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  stepDot: { width: 30, height: 30, borderRadius: 15, justifyContent: 'center', alignItems: 'center' },
   heading: { marginBottom: Spacing.xl },
-  stepperSection: {
-    alignItems: 'center',
-    paddingVertical: Spacing.xl,
-    marginBottom: Spacing.md,
-  },
-  stepperRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xl,
-  },
-  stepperButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    borderWidth: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  stepperIcon: {
-    fontSize: 24,
-    fontWeight: '600',
-  },
-  quantityText: {
-    fontSize: 48,
-    fontWeight: '700',
-    width: 64,
-    textAlign: 'center',
-    fontVariant: ['tabular-nums'],
-  },
-  infoBox: {
-    borderRadius: Radii.md,
-    padding: Spacing.md,
-    marginBottom: Spacing.lg,
-  },
-  ctaContainer: { marginTop: 'auto', paddingBottom: Spacing.xl },
-  primaryButton: {
-    borderRadius: Radii.sm,
-    paddingVertical: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 52,
-  },
+  title: { fontSize: 24, fontWeight: '700', color: '#1A1A2E', letterSpacing: -0.3 },
+  sub: { fontSize: 15, color: '#64748B', marginTop: Spacing.xs, lineHeight: 22 },
+  stepperSection: { alignItems: 'center', paddingVertical: Spacing.xl, marginBottom: Spacing.md },
+  stepperLabel: { fontSize: 14, color: '#64748B', fontWeight: '500', marginBottom: Spacing.md },
+  stepperRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xl },
+  stepperBtn: { width: 56, height: 56, borderRadius: 28, borderWidth: 1.5, borderColor: '#CBD5E1', backgroundColor: '#FFFFFF', justifyContent: 'center', alignItems: 'center' },
+  stepperIcon: { fontSize: 24, fontWeight: '600', color: '#1A1A2E' },
+  qtyText: { fontSize: 52, fontWeight: '800', width: 80, textAlign: 'center', fontVariant: ['tabular-nums'], color: '#1A1A2E' },
+  hint: { fontSize: 13, color: '#94A3B8', marginTop: Spacing.md },
+  infoBox: { borderRadius: Radii.md, padding: Spacing.md, marginBottom: Spacing.lg, backgroundColor: '#F0F9FF', borderWidth: 1, borderColor: '#BAE6FD' },
+  infoText: { fontSize: 14, color: '#0C5A8A' },
+  cta: { marginTop: 'auto', paddingBottom: Spacing.xl },
+  btn: { borderRadius: Radii.md, overflow: 'hidden' },
+  btnGrad: { paddingVertical: 16, alignItems: 'center', justifyContent: 'center', minHeight: 54 },
+  btnText: { fontSize: 16, fontWeight: '700', color: '#FFF', letterSpacing: 0.3 },
 });

@@ -1,9 +1,6 @@
-import { Stack } from 'expo-router';
+import React from 'react';
+import { Outlet } from 'react-router-dom';
 
 export default function AppLayout() {
-  return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="dashboard/index" />
-    </Stack>
-  );
+  return <Outlet />;
 }

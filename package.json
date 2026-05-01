@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "eslint-config-next": "^15.5.7",
+    "expo": "~54.0.33",
     "next": "^15.5.7"
   },
   "overrides": {
