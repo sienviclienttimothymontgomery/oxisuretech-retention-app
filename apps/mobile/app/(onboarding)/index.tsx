@@ -11,10 +11,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/providers/AuthProvider';
 import { supabase } from '@/lib/supabase';
-import { Colors, Spacing, Radii, Typography } from '@/constants/theme';
+import { Colors, Spacing, Radii, Typography, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import StepIndicator from '@/components/StepIndicator';
 
-const STEPS = ['Type', 'Product', 'Quantity', 'Done'];
+const STEPS = ['Type', 'Product', 'Quantity', 'Alerts'];
 
 export default function UserTypeScreen() {
   const navigate = useNavigate();
@@ -28,6 +29,8 @@ export default function UserTypeScreen() {
   // Animations
   const fadeIn = useRef(new Animated.Value(0)).current;
   const slideUp = useRef(new Animated.Value(25)).current;
+  const card1Scale = useRef(new Animated.Value(1)).current;
+  const card2Scale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -35,6 +38,14 @@ export default function UserTypeScreen() {
       Animated.spring(slideUp, { toValue: 0, tension: 50, friction: 10, useNativeDriver: true }),
     ]).start();
   }, []);
+
+  const handleCardPress = (type: string, scaleRef: Animated.Value) => {
+    setUserType(type);
+    Animated.sequence([
+      Animated.timing(scaleRef, { toValue: 0.97, duration: 100, useNativeDriver: true }),
+      Animated.spring(scaleRef, { toValue: 1, tension: 200, friction: 10, useNativeDriver: true }),
+    ]).start();
+  };
 
   const handleContinue = async () => {
     if (!userType || !user) return;
@@ -54,44 +65,7 @@ export default function UserTypeScreen() {
 
       <View style={styles.content}>
         {/* Step Indicator */}
-        <View style={styles.stepRow}>
-          {STEPS.map((step, i) => (
-            <View key={step} style={styles.stepItem}>
-              <View
-                style={[
-                  styles.stepDot,
-                  {
-                    backgroundColor:
-                      i === 0 ? '#0EA5E9' : '#E2E8F0',
-                    borderWidth: i === 0 ? 0 : 1,
-                    borderColor: '#CBD5E1',
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    Typography.caption,
-                    { color: i === 0 ? '#FFFFFF' : '#94A3B8' },
-                  ]}
-                >
-                  {i + 1}
-                </Text>
-              </View>
-              <Text
-                style={[
-                  Typography.caption,
-                  {
-                    color: i === 0 ? '#0C5A8A' : '#94A3B8',
-                    marginTop: 4,
-                    fontWeight: i === 0 ? '600' : '400',
-                  },
-                ]}
-              >
-                {step}
-              </Text>
-            </View>
-          ))}
-        </View>
+        <StepIndicator steps={STEPS} currentStep={0} />
 
         {/* Heading */}
         <Animated.View
@@ -113,109 +87,97 @@ export default function UserTypeScreen() {
             { opacity: fadeIn, transform: [{ translateY: slideUp }] },
           ]}
         >
-          <TouchableOpacity
-            style={[
-              styles.radioCard,
-              {
-                borderColor: userType === 'self' ? '#1976D2' : '#CBD5E1',
-                backgroundColor:
-                  userType === 'self'
-                    ? '#E8F4FD'
-                    : '#F5F8FC',
-              },
-            ]}
-            onPress={() => setUserType('self')}
-            activeOpacity={0.85}
-          >
-            <View style={styles.radioCardContent}>
-              <View
-                style={[
-                  styles.radioIcon,
-                  {
-                    backgroundColor:
-                      userType === 'self'
-                        ? 'rgba(25, 118, 210, 0.1)'
-                        : 'rgba(0, 0, 0, 0.05)',
-                  },
-                ]}
-              >
-                <Text style={{ fontSize: 18 }}>👤</Text>
-              </View>
-              <View style={styles.radioCardText}>
-                <Text style={[styles.radioTitle, { color: '#1A2A4A' }]}>Just for me</Text>
-                <Text style={[styles.radioDesc, { color: '#475569' }]}>
-                  I use oxygen tubing and want to track my own replacements.
-                </Text>
-              </View>
-            </View>
-            <View
+          <Animated.View style={{ transform: [{ scale: card1Scale }] }}>
+            <TouchableOpacity
               style={[
-                styles.radioOuter,
+                styles.radioCard,
                 {
-                  borderColor: userType === 'self' ? '#1976D2' : '#94A3B8',
+                  borderColor: userType === 'self' ? '#0EA5E9' : '#E2E8F0',
+                  backgroundColor: userType === 'self' ? '#F0F9FF' : '#FFFFFF',
                 },
               ]}
+              onPress={() => handleCardPress('self', card1Scale)}
+              activeOpacity={0.85}
             >
-              {userType === 'self' && (
-                <View style={[styles.radioInner, { backgroundColor: '#1976D2' }]} />
-              )}
-            </View>
-          </TouchableOpacity>
+              <View style={styles.radioCardContent}>
+                <View
+                  style={[
+                    styles.radioIcon,
+                    {
+                      backgroundColor: userType === 'self' ? '#0EA5E9' + '18' : '#F1F5F9',
+                    },
+                  ]}
+                >
+                  <Text style={{ fontSize: 20 }}>👤</Text>
+                </View>
+                <View style={styles.radioCardText}>
+                  <Text style={styles.radioTitle}>Just for me</Text>
+                  <Text style={styles.radioDesc}>
+                    I use oxygen tubing and want to track my own replacements.
+                  </Text>
+                </View>
+              </View>
+              <View
+                style={[
+                  styles.radioOuter,
+                  { borderColor: userType === 'self' ? '#0EA5E9' : '#CBD5E1' },
+                ]}
+              >
+                {userType === 'self' && (
+                  <View style={[styles.radioInner, { backgroundColor: '#0EA5E9' }]} />
+                )}
+              </View>
+            </TouchableOpacity>
+          </Animated.View>
 
-          <TouchableOpacity
-            style={[
-              styles.radioCard,
-              {
-                borderColor: userType === 'caregiver' ? '#1976D2' : '#CBD5E1',
-                backgroundColor:
-                  userType === 'caregiver'
-                    ? '#E8F4FD'
-                    : '#F5F8FC',
-              },
-            ]}
-            onPress={() => setUserType('caregiver')}
-            activeOpacity={0.85}
-          >
-            <View style={styles.radioCardContent}>
-              <View
-                style={[
-                  styles.radioIcon,
-                  {
-                    backgroundColor:
-                      userType === 'caregiver'
-                        ? 'rgba(25, 118, 210, 0.1)'
-                        : 'rgba(0, 0, 0, 0.05)',
-                  },
-                ]}
-              >
-                <Text style={{ fontSize: 18 }}>👥</Text>
-              </View>
-              <View style={styles.radioCardText}>
-                <Text style={[styles.radioTitle, { color: '#1A2A4A' }]}>I'm a caregiver</Text>
-                <Text style={[styles.radioDesc, { color: '#475569' }]}>
-                  I help manage supplies for one or more people who use oxygen.
-                </Text>
-              </View>
-            </View>
-            <View
+          <Animated.View style={{ transform: [{ scale: card2Scale }] }}>
+            <TouchableOpacity
               style={[
-                styles.radioOuter,
+                styles.radioCard,
                 {
-                  borderColor: userType === 'caregiver' ? '#1976D2' : '#94A3B8',
+                  borderColor: userType === 'caregiver' ? '#0EA5E9' : '#E2E8F0',
+                  backgroundColor: userType === 'caregiver' ? '#F0F9FF' : '#FFFFFF',
                 },
               ]}
+              onPress={() => handleCardPress('caregiver', card2Scale)}
+              activeOpacity={0.85}
             >
-              {userType === 'caregiver' && (
-                <View style={[styles.radioInner, { backgroundColor: '#1976D2' }]} />
-              )}
-            </View>
-          </TouchableOpacity>
+              <View style={styles.radioCardContent}>
+                <View
+                  style={[
+                    styles.radioIcon,
+                    {
+                      backgroundColor: userType === 'caregiver' ? '#0EA5E9' + '18' : '#F1F5F9',
+                    },
+                  ]}
+                >
+                  <Text style={{ fontSize: 20 }}>👥</Text>
+                </View>
+                <View style={styles.radioCardText}>
+                  <Text style={styles.radioTitle}>I'm a caregiver</Text>
+                  <Text style={styles.radioDesc}>
+                    I help manage supplies for one or more people who use oxygen.
+                  </Text>
+                </View>
+              </View>
+              <View
+                style={[
+                  styles.radioOuter,
+                  { borderColor: userType === 'caregiver' ? '#0EA5E9' : '#CBD5E1' },
+                ]}
+              >
+                {userType === 'caregiver' && (
+                  <View style={[styles.radioInner, { backgroundColor: '#0EA5E9' }]} />
+                )}
+              </View>
+            </TouchableOpacity>
+          </Animated.View>
         </Animated.View>
 
         {/* CTA */}
         <View style={styles.ctaContainer}>
           <TouchableOpacity
-            style={[styles.primaryButton, { opacity: loading ? 0.7 : 1 }]}
+            style={[styles.primaryButton, { opacity: (!userType || loading) ? 0.5 : 1 }]}
             onPress={handleContinue}
             disabled={!userType || loading}
             activeOpacity={0.85}
@@ -224,7 +186,7 @@ export default function UserTypeScreen() {
               colors={
                 userType
                   ? ['#38BDF8', '#0EA5E9', '#0284C7']
-                  : ['#E2E8F0', '#CBD5E1']
+                  : ['#E2E8F0', '#CBD5E1', '#E2E8F0']
               }
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
@@ -254,33 +216,18 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { flex: 1, paddingHorizontal: Spacing.lg, paddingTop: Spacing.xxl },
 
-  /* Steps */
-  stepRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: Spacing.lg,
-    marginBottom: Spacing.xl,
-    paddingTop: Spacing.lg,
-  },
-  stepItem: { alignItems: 'center' },
-  stepDot: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
   /* Heading */
   heading: { marginBottom: Spacing.lg },
   headingTitle: {
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: 26,
+    fontWeight: '800',
+    fontFamily: 'Inter',
     color: '#1A1A2E',
     letterSpacing: -0.3,
   },
   headingSub: {
     fontSize: 15,
+    fontFamily: 'Inter',
     color: '#64748B',
     marginTop: Spacing.xs,
     lineHeight: 22,
@@ -293,8 +240,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     borderWidth: 1.5,
-    borderRadius: Radii.md,
-    padding: Spacing.md,
+    borderRadius: Radii.lg,
+    padding: Spacing.md + 2,
+    ...Shadows.sm,
   },
   radioCardContent: {
     flexDirection: 'row',
@@ -303,26 +251,30 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   radioIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: Radii.sm,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
   },
   radioCardText: { flex: 1 },
   radioTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 2,
+    fontWeight: '700',
+    fontFamily: 'Inter',
+    color: '#1A1A2E',
+    marginBottom: 3,
   },
   radioDesc: {
     fontSize: 13,
+    fontFamily: 'Inter',
+    color: '#475569',
     lineHeight: 18,
   },
   radioOuter: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     borderWidth: 2,
     justifyContent: 'center',
     alignItems: 'center',
@@ -339,16 +291,19 @@ const styles = StyleSheet.create({
   primaryButton: {
     borderRadius: Radii.md,
     overflow: 'hidden',
+    ...Shadows.glow('#0EA5E9'),
   },
   primaryButtonGradient: {
     paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 54,
+    minHeight: 56,
+    borderRadius: Radii.md,
   },
   primaryButtonText: {
     fontSize: 16,
     fontWeight: '700',
+    fontFamily: 'Inter',
     letterSpacing: 0.3,
   },
 });

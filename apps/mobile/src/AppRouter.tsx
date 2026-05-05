@@ -6,6 +6,7 @@ import IndexScreen from '../app/index';
 import LoginScreen from '../app/(auth)/login/index';
 import DashboardScreen from '../app/(app)/dashboard/index';
 import AdminDashboardScreen from '../app/(app)/admin/index';
+import SettingsScreen from '../app/(app)/settings/index';
 import OnboardingIndexScreen from '../app/(onboarding)/index';
 import OnboardingWelcomeScreen from '../app/(onboarding)/welcome';
 import OnboardingConfirmProductScreen from '../app/(onboarding)/confirm-product';
@@ -21,6 +22,7 @@ export default function AppRouter() {
           <Route path="/(auth)/login" element={<LoginScreen />} />
           <Route path="/(app)/dashboard" element={<DashboardScreen />} />
           <Route path="/(app)/admin" element={<AdminDashboardScreen />} />
+          <Route path="/(app)/settings" element={<SettingsScreen />} />
           <Route path="/(onboarding)" element={<OnboardingIndexScreen />} />
           <Route path="/(onboarding)/welcome" element={<OnboardingWelcomeScreen />} />
           <Route path="/(onboarding)/confirm-product" element={<OnboardingConfirmProductScreen />} />

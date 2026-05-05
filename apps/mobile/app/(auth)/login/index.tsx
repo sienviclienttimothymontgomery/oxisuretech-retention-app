@@ -46,11 +46,12 @@ export default function LoginScreen() {
   const cardOpacity = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const buttonScale = useRef(new Animated.Value(1)).current;
+  const orbAnim1 = useRef(new Animated.Value(0)).current;
+  const orbAnim2 = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     // Entrance animation sequence
     Animated.sequence([
-      // Logo entrance: scale + gentle rotation
       Animated.parallel([
         Animated.spring(logoScale, {
           toValue: 1,
@@ -64,7 +65,6 @@ export default function LoginScreen() {
           useNativeDriver: true,
         }),
       ]),
-      // Card slides up + fades in
       Animated.parallel([
         Animated.spring(cardTranslate, {
           toValue: 0,
@@ -84,15 +84,29 @@ export default function LoginScreen() {
     Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
-          toValue: 1.08,
-          duration: 2000,
+          toValue: 1.06,
+          duration: 2500,
           useNativeDriver: true,
         }),
         Animated.timing(pulseAnim, {
           toValue: 1,
-          duration: 2000,
+          duration: 2500,
           useNativeDriver: true,
         }),
+      ]),
+    ).start();
+
+    // Floating orb animations
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(orbAnim1, { toValue: 1, duration: 6000, useNativeDriver: true }),
+        Animated.timing(orbAnim1, { toValue: 0, duration: 6000, useNativeDriver: true }),
+      ]),
+    ).start();
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(orbAnim2, { toValue: 1, duration: 8000, useNativeDriver: true }),
+        Animated.timing(orbAnim2, { toValue: 0, duration: 8000, useNativeDriver: true }),
       ]),
     ).start();
   }, []);
@@ -106,7 +120,6 @@ export default function LoginScreen() {
     setError(null);
     setMessage(null);
 
-    // Button press micro-animation
     Animated.sequence([
       Animated.timing(buttonScale, { toValue: 0.96, duration: 100, useNativeDriver: true }),
       Animated.timing(buttonScale, { toValue: 1, duration: 100, useNativeDriver: true }),
@@ -139,12 +152,44 @@ export default function LoginScreen() {
 
   const logoSpin = logoRotate.interpolate({
     inputRange: [0, 1],
-    outputRange: ['-10deg', '0deg'],
+    outputRange: ['-8deg', '0deg'],
+  });
+
+  const orbTranslateY1 = orbAnim1.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 15],
+  });
+  const orbTranslateY2 = orbAnim2.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -12],
   });
 
   return (
     <View style={styles.container}>
       <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.bg }]} />
+
+      {/* Floating Decorative Orbs */}
+      <Animated.View
+        style={[
+          styles.orb,
+          styles.orbTopRight,
+          { transform: [{ translateY: orbTranslateY1 }] },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.orb,
+          styles.orbBottomLeft,
+          { transform: [{ translateY: orbTranslateY2 }] },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.orb,
+          styles.orbCenter,
+          { transform: [{ translateY: orbTranslateY1 }] },
+        ]}
+      />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -168,24 +213,24 @@ export default function LoginScreen() {
             ]}
           >
             <Animated.View style={[styles.logoGlow, { transform: [{ scale: pulseAnim }] }]}>
-              <Image
-                source={logoImage}
-                style={styles.logoImage}
-                resizeMode="contain"
-              />
+              <View style={styles.logoBackdrop}>
+                <Image
+                  source={logoImage}
+                  style={styles.logoImage}
+                  resizeMode="contain"
+                />
+              </View>
             </Animated.View>
             <Text style={styles.brandTagline}>
               {isSignUp ? 'Create your account' : 'Welcome back'}
             </Text>
           </Animated.View>
 
-          {/* Glassmorphism Form Card */}
+          {/* Form Card */}
           <Animated.View
             style={[
               styles.glassCard,
               {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
                 transform: [{ translateY: cardTranslate }],
                 opacity: cardOpacity,
               },
@@ -212,12 +257,14 @@ export default function LoginScreen() {
                 style={[
                   styles.inputContainer,
                   {
-                    backgroundColor: '#FFFFFF',
-                    borderColor: emailFocused ? colors.primary : colors.border,
+                    borderColor: emailFocused ? colors.accent : colors.border,
+                    ...(emailFocused ? Shadows.glow(colors.accent + '40') : {}),
                   },
                 ]}
               >
-                <MailIcon color={colors.icon} />
+                <View style={[styles.inputIconCircle, { backgroundColor: emailFocused ? '#EFF6FF' : '#F8FAFC' }]}>
+                  <MailIcon color={emailFocused ? colors.accent : colors.textMuted} />
+                </View>
                 <TextInput
                   style={styles.input}
                   placeholder="you@example.com"
@@ -240,12 +287,14 @@ export default function LoginScreen() {
                 style={[
                   styles.inputContainer,
                   {
-                    backgroundColor: '#FFFFFF',
-                    borderColor: passwordFocused ? colors.primary : colors.border,
+                    borderColor: passwordFocused ? colors.accent : colors.border,
+                    ...(passwordFocused ? Shadows.glow(colors.accent + '40') : {}),
                   },
                 ]}
               >
-                <LockIcon color={colors.icon} />
+                <View style={[styles.inputIconCircle, { backgroundColor: passwordFocused ? '#EFF6FF' : '#F8FAFC' }]}>
+                  <LockIcon color={passwordFocused ? colors.accent : colors.textMuted} />
+                </View>
                 <TextInput
                   style={styles.input}
                   placeholder="••••••••"
@@ -261,7 +310,7 @@ export default function LoginScreen() {
                   style={styles.eyeButton}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
-                  {showPassword ? <EyeOffIcon color={colors.icon} /> : <EyeIcon color={colors.icon} />}
+                  {showPassword ? <EyeOffIcon color={colors.textMuted} /> : <EyeIcon color={colors.textMuted} />}
                 </TouchableOpacity>
               </View>
             </View>
@@ -284,8 +333,11 @@ export default function LoginScreen() {
                 disabled={loading || googleLoading}
                 activeOpacity={0.85}
               >
-                <View
-                  style={[styles.primaryButtonGradient, { backgroundColor: colors.primary }]}
+                <LinearGradient
+                  colors={['#38BDF8', '#0EA5E9', '#0284C7']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.primaryButtonGradient}
                 >
                   {loading ? (
                     <ActivityIndicator color="#FFFFFF" />
@@ -294,7 +346,7 @@ export default function LoginScreen() {
                       {isSignUp ? 'Create Account' : 'Sign In'}
                     </Text>
                   )}
-                </View>
+                </LinearGradient>
               </TouchableOpacity>
             </Animated.View>
 
@@ -317,16 +369,26 @@ export default function LoginScreen() {
 
             {/* Divider */}
             <View style={styles.dividerRow}>
-              <View style={styles.dividerLine} />
+              <LinearGradient
+                colors={['transparent', '#CBD5E1', 'transparent']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.dividerGradient}
+              />
               <Text style={styles.dividerText}>or continue with</Text>
-              <View style={styles.dividerLine} />
+              <LinearGradient
+                colors={['transparent', '#CBD5E1', 'transparent']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.dividerGradient}
+              />
             </View>
 
             {/* OAuth Buttons */}
             <View style={styles.oauthRow}>
               <TouchableOpacity
-                style={[styles.oauthButton, { borderColor: colors.border }]}
-                activeOpacity={0.8}
+                style={styles.oauthButton}
+                activeOpacity={0.75}
                 onPress={handleGoogleSignIn}
                 disabled={loading || googleLoading}
               >
@@ -334,17 +396,21 @@ export default function LoginScreen() {
                   <ActivityIndicator size="small" color={colors.text} />
                 ) : (
                   <View style={styles.oauthButtonContent}>
-                    <GoogleIcon size={20} />
+                    <View style={styles.oauthIconCircle}>
+                      <GoogleIcon size={18} />
+                    </View>
                     <Text style={styles.oauthButtonText}>Google</Text>
                   </View>
                 )}
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.oauthButton, { borderColor: colors.border }]}
-                activeOpacity={0.8}
+                style={styles.oauthButton}
+                activeOpacity={0.75}
               >
                 <View style={styles.oauthButtonContent}>
-                  <AppleIcon size={20} color={colors.text} />
+                  <View style={[styles.oauthIconCircle, { backgroundColor: '#1A1A2E' }]}>
+                    <AppleIcon size={16} color="#FFFFFF" />
+                  </View>
                   <Text style={styles.oauthButtonText}>Apple</Text>
                 </View>
               </TouchableOpacity>
@@ -398,7 +464,7 @@ function AppleIcon({ size = 20, color = '#FFFFFF' }: { size?: number, color?: st
 
 function MailIcon({ color = "rgba(255,255,255,0.5)" }: { color?: string }) {
   return (
-    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" style={{ marginRight: 10 }}>
+    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
       <Rect x="2" y="4" width="20" height="16" rx="3" stroke={color} strokeWidth="1.5" />
       <Path d="M2 7l10 6 10-6" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
     </Svg>
@@ -407,7 +473,7 @@ function MailIcon({ color = "rgba(255,255,255,0.5)" }: { color?: string }) {
 
 function LockIcon({ color = "rgba(255,255,255,0.5)" }: { color?: string }) {
   return (
-    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" style={{ marginRight: 10 }}>
+    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
       <Rect x="3" y="11" width="18" height="11" rx="3" stroke={color} strokeWidth="1.5" />
       <Path d="M7 11V7a5 5 0 0110 0v4" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
     </Svg>
@@ -458,34 +524,32 @@ const styles = StyleSheet.create({
   },
 
   /* Decorative Orbs */
-  orbContainer: {
-    ...StyleSheet.absoluteFillObject,
-    overflow: 'hidden',
-  },
   orb: {
     position: 'absolute',
     borderRadius: 9999,
-    opacity: 0.08,
   },
   orbTopRight: {
-    width: 300,
-    height: 300,
+    width: 280,
+    height: 280,
     backgroundColor: '#38BDF8',
+    opacity: 0.04,
     top: -80,
     right: -80,
   },
   orbBottomLeft: {
-    width: 250,
-    height: 250,
+    width: 220,
+    height: 220,
     backgroundColor: '#0EA5E9',
+    opacity: 0.05,
     bottom: -60,
-    left: -100,
+    left: -90,
   },
   orbCenter: {
-    width: 180,
-    height: 180,
+    width: 160,
+    height: 160,
     backgroundColor: '#7DD3FC',
-    top: '45%',
+    opacity: 0.03,
+    top: '50%',
     right: -40,
   },
 
@@ -497,23 +561,31 @@ const styles = StyleSheet.create({
   logoGlow: {
     marginBottom: Spacing.sm,
   },
+  logoBackdrop: {
+    padding: Spacing.sm,
+    borderRadius: Radii.xl,
+  },
   logoImage: {
-    width: 250,
-    height: 150,
+    width: 240,
+    height: 140,
   },
   brandTagline: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '500',
-    color: '#475569', // colors.textSecondary
+    fontFamily: 'Inter',
+    color: '#475569',
     marginTop: Spacing.xs,
+    letterSpacing: 0.2,
   },
 
-  /* Glass Card -> Solid Card */
+  /* Form Card */
   glassCard: {
-    borderRadius: Radii.lg,
+    borderRadius: Radii.xl,
     borderWidth: 1,
+    borderColor: '#E2E8F0',
     padding: Spacing.lg,
     gap: Spacing.md,
+    backgroundColor: '#FFFFFF',
     ...Shadows.lg,
   },
 
@@ -523,18 +595,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 10,
     paddingHorizontal: Spacing.md,
-    borderRadius: Radii.sm,
+    borderRadius: Radii.md,
     gap: Spacing.sm,
   },
   alertError: {
-    backgroundColor: 'rgba(220, 38, 38, 0.15)',
+    backgroundColor: '#FEF2F2',
     borderWidth: 1,
-    borderColor: 'rgba(220, 38, 38, 0.25)',
+    borderColor: '#FECACA',
   },
   alertSuccess: {
-    backgroundColor: 'rgba(22, 163, 74, 0.15)',
+    backgroundColor: '#F0FDF4',
     borderWidth: 1,
-    borderColor: 'rgba(22, 163, 74, 0.25)',
+    borderColor: '#BBF7D0',
   },
   alertIcon: {
     fontSize: 14,
@@ -542,24 +614,27 @@ const styles = StyleSheet.create({
   alertText: {
     flex: 1,
     fontSize: 13,
-    color: '#F87171',
+    fontFamily: 'Inter',
+    color: '#DC2626',
     fontWeight: '500',
   },
   alertTextSuccess: {
     flex: 1,
     fontSize: 13,
-    color: '#4ADE80',
+    fontFamily: 'Inter',
+    color: '#16A34A',
     fontWeight: '500',
   },
 
   /* Inputs */
   inputWrapper: {
-    gap: Spacing.xs,
+    gap: 6,
   },
   inputLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#475569', // colors.textSecondary
+    fontFamily: 'Inter',
+    color: '#475569',
     letterSpacing: 0.3,
     textTransform: 'uppercase',
     marginLeft: 2,
@@ -567,19 +642,29 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: Radii.sm, // 8px
-    paddingHorizontal: Spacing.md,
-    minHeight: 52,
+    borderWidth: 1.5,
+    borderRadius: Radii.md,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: Spacing.sm,
+    minHeight: 54,
+  },
+  inputIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: Spacing.sm,
   },
   input: {
     flex: 1,
     fontSize: 16,
-    color: '#1A1A2E', // colors.text
+    fontFamily: 'Inter',
+    color: '#1A1A2E',
     paddingVertical: 14,
   },
   eyeButton: {
-    padding: 4,
+    padding: 6,
   },
 
   /* Forgot Password */
@@ -589,25 +674,29 @@ const styles = StyleSheet.create({
   },
   forgotText: {
     fontSize: 13,
-    color: '#0C5A8A', // colors.primary
+    fontFamily: 'Inter',
+    color: '#0C5A8A',
     fontWeight: '600',
   },
 
   /* Primary Button */
   primaryButton: {
-    borderRadius: Radii.sm, // 8px
+    borderRadius: Radii.md,
     overflow: 'hidden',
     marginTop: Spacing.xs,
+    ...Shadows.glow('#0EA5E9'),
   },
   primaryButtonGradient: {
     paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 54,
+    minHeight: 56,
+    borderRadius: Radii.md,
   },
   primaryButtonText: {
     fontSize: 16,
     fontWeight: '700',
+    fontFamily: 'Inter',
     color: '#FFFFFF',
     letterSpacing: 0.3,
   },
@@ -619,11 +708,12 @@ const styles = StyleSheet.create({
   },
   toggleText: {
     fontSize: 14,
-    color: '#475569', // colors.textSecondary
+    fontFamily: 'Inter',
+    color: '#475569',
   },
   toggleLink: {
-    color: '#0C5A8A', // colors.primary
-    fontWeight: '600',
+    color: '#0C5A8A',
+    fontWeight: '700',
   },
 
   /* Divider */
@@ -631,14 +721,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  dividerLine: {
+  dividerGradient: {
     flex: 1,
     height: 1,
-    backgroundColor: '#E2E8F0', // colors.border
   },
   dividerText: {
     fontSize: 12,
-    color: '#94A3B8', // colors.textMuted
+    fontFamily: 'Inter',
+    color: '#94A3B8',
     marginHorizontal: Spacing.md,
     textTransform: 'uppercase',
     fontWeight: '500',
@@ -652,36 +742,48 @@ const styles = StyleSheet.create({
   },
   oauthButton: {
     flex: 1,
-    borderWidth: 1,
-    borderRadius: Radii.sm, // 8px
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: Radii.md,
     paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 52,
+    minHeight: 54,
     backgroundColor: '#FFFFFF',
+    ...Shadows.sm,
   },
   oauthButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.sm,
+    gap: Spacing.sm + 2,
+  },
+  oauthIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   oauthButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#1F2937', // Google Brand Guideline dark text
+    fontFamily: 'Inter',
+    color: '#1F2937',
   },
 
   /* Footer */
   footerText: {
     fontSize: 12,
-    color: '#94A3B8', // colors.textMuted
+    fontFamily: 'Inter',
+    color: '#94A3B8',
     textAlign: 'center',
     marginTop: Spacing.lg,
     lineHeight: 18,
   },
   footerLink: {
-    color: '#475569', // colors.textSecondary
-    fontWeight: '500',
+    color: '#475569',
+    fontWeight: '600',
   },
 });

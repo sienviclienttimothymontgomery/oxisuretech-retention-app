@@ -8,6 +8,7 @@ import {
   Dimensions,
   Image,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigate } from 'react-router-dom';
 import { Colors, Spacing, Radii, Typography, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -31,29 +32,26 @@ export default function WelcomeScreen() {
   const ctaOpacity = useRef(new Animated.Value(0)).current;
   const ctaTranslate = useRef(new Animated.Value(20)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const ctaGlowAnim = useRef(new Animated.Value(0.15)).current;
+  const orbAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.stagger(200, [
-      // Logo bounce in
       Animated.spring(logoScale, {
         toValue: 1,
         tension: 50,
         friction: 7,
         useNativeDriver: true,
       }),
-      // Title fade + slide
       Animated.parallel([
         Animated.timing(titleOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
         Animated.timing(titleTranslate, { toValue: 0, duration: 500, useNativeDriver: true }),
       ]),
-      // Subtitle
       Animated.timing(subtitleOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
-      // Features
       Animated.parallel([
         Animated.timing(featureOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
         Animated.timing(featureTranslate, { toValue: 0, duration: 500, useNativeDriver: true }),
       ]),
-      // CTA
       Animated.parallel([
         Animated.timing(ctaOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
         Animated.timing(ctaTranslate, { toValue: 0, duration: 400, useNativeDriver: true }),
@@ -63,21 +61,50 @@ export default function WelcomeScreen() {
     // Logo glow pulse
     Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.06, duration: 2500, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1.04, duration: 2500, useNativeDriver: true }),
         Animated.timing(pulseAnim, { toValue: 1, duration: 2500, useNativeDriver: true }),
+      ]),
+    ).start();
+
+    // CTA button glow
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(ctaGlowAnim, { toValue: 0.35, duration: 1500, useNativeDriver: true }),
+        Animated.timing(ctaGlowAnim, { toValue: 0.15, duration: 1500, useNativeDriver: true }),
+      ]),
+    ).start();
+
+    // Background orbs
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(orbAnim, { toValue: 1, duration: 7000, useNativeDriver: true }),
+        Animated.timing(orbAnim, { toValue: 0, duration: 7000, useNativeDriver: true }),
       ]),
     ).start();
   }, []);
 
+  const orbTranslateY = orbAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 18],
+  });
+
   const features = [
-    { emoji: '📦', title: 'Track Replacements', desc: 'Know exactly when your supplies are due' },
-    { emoji: '🔔', title: 'Smart Reminders', desc: 'Never miss a replacement cycle again' },
-    { emoji: '💰', title: 'Easy Reordering', desc: 'One-tap reorder with exclusive discounts' },
+    { emoji: '📦', title: 'Track Replacements', desc: 'Know exactly when your supplies are due', accentColor: '#0EA5E9' },
+    { emoji: '🔔', title: 'Smart Reminders', desc: 'Never miss a replacement cycle again', accentColor: '#8B5CF6' },
+    { emoji: '💰', title: 'Easy Reordering', desc: 'One-tap reorder with exclusive discounts', accentColor: '#10B981' },
   ];
 
   return (
     <View style={styles.container}>
       <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.bg }]} />
+
+      {/* Floating Orbs */}
+      <Animated.View
+        style={[styles.orb, styles.orbTopRight, { transform: [{ translateY: orbTranslateY }] }]}
+      />
+      <Animated.View
+        style={[styles.orb, styles.orbBottomLeft, { transform: [{ translateY: Animated.multiply(orbTranslateY, -1) }] }]}
+      />
 
       <View style={styles.content}>
         {/* Logo */}
@@ -119,7 +146,8 @@ export default function WelcomeScreen() {
         >
           {features.map((f, i) => (
             <View key={i} style={styles.featureCard}>
-              <View style={styles.featureIconContainer}>
+              <View style={[styles.featureAccentBar, { backgroundColor: f.accentColor }]} />
+              <View style={[styles.featureIconContainer, { backgroundColor: f.accentColor + '12' }]}>
                 <Text style={styles.featureEmoji}>{f.emoji}</Text>
               </View>
               <View style={styles.featureTextContainer}>
@@ -145,12 +173,15 @@ export default function WelcomeScreen() {
             onPress={() => navigate('/(onboarding)')}
             activeOpacity={0.85}
           >
-            <View
-              style={[styles.primaryButtonGradient, { backgroundColor: colors.primary }]}
+            <LinearGradient
+              colors={['#38BDF8', '#0EA5E9', '#0284C7']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.primaryButtonGradient}
             >
               <Text style={styles.primaryButtonText}>Let's Get Started</Text>
               <Text style={styles.primaryButtonArrow}>→</Text>
-            </View>
+            </LinearGradient>
           </TouchableOpacity>
 
           <Text style={styles.setupTime}>⏱ This quick setup takes about 1 minute</Text>
@@ -172,28 +203,25 @@ const styles = StyleSheet.create({
   },
 
   /* Orbs */
-  orbContainer: {
-    ...StyleSheet.absoluteFillObject,
-    overflow: 'hidden',
-  },
   orb: {
     position: 'absolute',
     borderRadius: 9999,
-    opacity: 0.08,
   },
   orbTopRight: {
-    width: 300,
-    height: 300,
+    width: 280,
+    height: 280,
     backgroundColor: '#38BDF8',
+    opacity: 0.04,
     top: -80,
     right: -80,
   },
   orbBottomLeft: {
-    width: 250,
-    height: 250,
+    width: 220,
+    height: 220,
     backgroundColor: '#0EA5E9',
+    opacity: 0.05,
     bottom: -60,
-    left: -100,
+    left: -90,
   },
 
   /* Logo */
@@ -207,8 +235,9 @@ const styles = StyleSheet.create({
 
   /* Typography */
   title: {
-    fontSize: 30,
+    fontSize: 32,
     fontWeight: '800',
+    fontFamily: 'Inter',
     color: '#1A1A2E',
     textAlign: 'center',
     letterSpacing: -0.5,
@@ -216,6 +245,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
+    fontFamily: 'Inter',
     color: '#475569',
     textAlign: 'center',
     lineHeight: 24,
@@ -226,26 +256,34 @@ const styles = StyleSheet.create({
   /* Feature Cards */
   featureList: {
     width: '100%',
-    gap: Spacing.sm,
+    gap: Spacing.sm + 2,
     marginBottom: Spacing.xl,
   },
   featureCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: Radii.md, // 12px
+    borderRadius: Radii.lg,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    paddingVertical: 14,
+    paddingVertical: 16,
     paddingHorizontal: Spacing.md,
+    paddingLeft: 0,
     gap: Spacing.md,
-    ...Shadows.sm,
+    overflow: 'hidden',
+    ...Shadows.md,
+  },
+  featureAccentBar: {
+    width: 4,
+    height: '100%',
+    borderTopLeftRadius: Radii.lg,
+    borderBottomLeftRadius: Radii.lg,
+    marginRight: Spacing.sm,
   },
   featureIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: Radii.sm,
-    backgroundColor: '#F0F9FF',
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -257,13 +295,15 @@ const styles = StyleSheet.create({
   },
   featureTitle: {
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: '700',
+    fontFamily: 'Inter',
     color: '#1A1A2E',
     marginBottom: 2,
   },
   featureDesc: {
     fontSize: 13,
-    color: '#475569',
+    fontFamily: 'Inter',
+    color: '#64748B',
     lineHeight: 18,
   },
 
@@ -273,8 +313,9 @@ const styles = StyleSheet.create({
     marginTop: 'auto',
   },
   primaryButton: {
-    borderRadius: Radii.sm, // 8px
+    borderRadius: Radii.md,
     overflow: 'hidden',
+    ...Shadows.glow('#0EA5E9'),
   },
   primaryButtonGradient: {
     flexDirection: 'row',
@@ -283,10 +324,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minHeight: 56,
     gap: Spacing.sm,
+    borderRadius: Radii.md,
   },
   primaryButtonText: {
     fontSize: 17,
     fontWeight: '700',
+    fontFamily: 'Inter',
     color: '#FFFFFF',
     letterSpacing: 0.3,
   },
@@ -297,6 +340,7 @@ const styles = StyleSheet.create({
   },
   setupTime: {
     fontSize: 13,
+    fontFamily: 'Inter',
     color: '#94A3B8',
     textAlign: 'center',
     marginTop: Spacing.md,

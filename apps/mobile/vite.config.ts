@@ -5,11 +5,23 @@ import path from 'path';
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
-    react({
-      babel: {
-        plugins: ['react-native-reanimated/plugin'],
+    react(),
+    // Stub out react-native-svg fabric modules that reference TurboModuleRegistry
+    {
+      name: 'stub-react-native-svg-fabric',
+      resolveId(source) {
+        if (source.includes('react-native-svg') && source.includes('fabric')) {
+          return source;
+        }
+        return null;
       },
-    }),
+      load(id) {
+        if (id.includes('react-native-svg') && id.includes('fabric')) {
+          return 'export default {}';
+        }
+        return null;
+      },
+    },
   ],
   resolve: {
     alias: {
@@ -24,6 +36,9 @@ export default defineConfig({
   define: {
     global: 'window',
     'process.env': {}
+  },
+  optimizeDeps: {
+    exclude: ['react-native-svg'],
   },
   build: {
     outDir: 'dist',

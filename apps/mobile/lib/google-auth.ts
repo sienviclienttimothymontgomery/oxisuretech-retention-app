@@ -5,24 +5,31 @@ export function configureGoogleSignIn() {
   // No-op for Capacitor. Browser handling is automatic.
 }
 
+/**
+ * Open the Google OAuth flow in the system browser.
+ *
+ * Uses PKCE flow (default). After authentication, Supabase redirects to
+ * our custom scheme with a `code` parameter in the query string:
+ *   com.anonymous.oxisuretechmobile://login-callback?code=xxx
+ *
+ * Query string params are reliably handled by Chrome for custom scheme
+ * redirects, unlike hash fragments (#access_token=...) which Chrome
+ * often blocks on Android.
+ */
 export async function signInWithGoogle() {
   try {
     const redirectTo = 'com.anonymous.oxisuretechmobile://login-callback';
 
     console.log('[Google Auth] Redirect URI:', redirectTo);
 
-    // 1. Get the OAuth URL from Supabase
-    // Force implicit flow so tokens come back in the URL hash directly.
-    // PKCE flow breaks in Capacitor because the code_verifier is stored in the
-    // WebView storage and can be lost when Android kills the app while the
-    // external browser is open.
+    // Use default PKCE flow — Supabase will redirect with ?code=xxx
+    // in the query string, which Android handles reliably.
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo,
-        skipBrowserRedirect: true, // We handle the browser ourselves
+        skipBrowserRedirect: true,
         queryParams: {
-          response_type: 'token',
           prompt: 'consent',
         },
       },
@@ -36,12 +43,14 @@ export async function signInWithGoogle() {
       return { data: null, error: new Error('No OAuth URL received from Supabase.') };
     }
 
-    // 2. Open the system browser
-    await Browser.open({ url: data.url });
+    console.log('[Google Auth] Opening browser with OAuth URL...');
 
-    // In Capacitor, the deep link listener in AuthProvider will handle the redirect,
-    // parse the tokens, and establish the session. We don't wait for it here.
-    return { data: null, error: null }; // Returning null data implies "redirecting..."
+    await Browser.open({
+      url: data.url,
+      presentationStyle: 'popover',
+    });
+
+    return { data: null, error: null };
 
   } catch (err) {
     console.error('[Google Auth] Error:', err);

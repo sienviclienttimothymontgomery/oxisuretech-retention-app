@@ -12,11 +12,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/providers/AuthProvider';
 import { supabase } from '@/lib/supabase';
-import { Colors, Spacing, Radii, Typography } from '@/constants/theme';
+import { Colors, Spacing, Radii, Typography, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { QRScanner } from '@/components/QRScanner';
+import StepIndicator from '@/components/StepIndicator';
 
-const STEPS = ['Type', 'Product', 'Quantity', 'Done'];
+const STEPS = ['Type', 'Product', 'Quantity', 'Alerts'];
 
 export default function ConfirmProductScreen() {
   const navigate = useNavigate();
@@ -44,7 +45,6 @@ export default function ConfirmProductScreen() {
   };
 
   const handleScan = (data: string) => {
-    // Validate scanned data against known SKUs
     if (data.includes('KP-1V19-Z7P4') || data.toUpperCase() === 'KP-1V19-Z7P4') {
       setScannedProduct({ sku: 'KP-1V19-Z7P4', name: 'OxiSure Oxygen Tubing', pack: '2 Pack' });
       setShowScanner(false);
@@ -65,48 +65,7 @@ export default function ConfirmProductScreen() {
 
       <View style={styles.content}>
         {/* Step Indicator */}
-        <View style={styles.stepRow}>
-          {STEPS.map((step, i) => (
-            <View key={step} style={styles.stepItem}>
-              <View
-                style={[
-                  styles.stepDot,
-                  {
-                    backgroundColor:
-                      i <= 1 ? '#0EA5E9' : '#E2E8F0',
-                    borderWidth: i > 1 ? 1 : 0,
-                    borderColor: '#CBD5E1',
-                  },
-                ]}
-              >
-                {i < 1 ? (
-                  <Text style={styles.stepCheck}>✓</Text>
-                ) : (
-                  <Text
-                    style={[
-                      Typography.caption,
-                      { color: i <= 1 ? '#FFFFFF' : '#94A3B8' },
-                    ]}
-                  >
-                    {i + 1}
-                  </Text>
-                )}
-              </View>
-              <Text
-                style={[
-                  Typography.caption,
-                  {
-                    color: i <= 1 ? '#0C5A8A' : '#94A3B8',
-                    marginTop: 4,
-                    fontWeight: i === 1 ? '600' : '400',
-                  },
-                ]}
-              >
-                {step}
-              </Text>
-            </View>
-          ))}
-        </View>
+        <StepIndicator steps={STEPS} currentStep={1} />
 
         {/* Heading */}
         <View style={styles.heading}>
@@ -123,7 +82,7 @@ export default function ConfirmProductScreen() {
           style={[
             styles.productCard,
             {
-              borderColor: scannedProduct ? '#4ADE80' : '#38BDF8',
+              borderColor: scannedProduct ? '#86EFAC' : '#7DD3FC',
             },
           ]}
         >
@@ -132,8 +91,8 @@ export default function ConfirmProductScreen() {
               styles.productIcon,
               {
                 backgroundColor: scannedProduct
-                  ? 'rgba(74, 222, 128, 0.15)'
-                  : 'rgba(56, 189, 248, 0.15)',
+                  ? 'rgba(74, 222, 128, 0.12)'
+                  : 'rgba(56, 189, 248, 0.12)',
               },
             ]}
           >
@@ -150,7 +109,7 @@ export default function ConfirmProductScreen() {
           <View
             style={[
               styles.checkBadge,
-              { backgroundColor: scannedProduct ? '#4ADE80' : '#0EA5E9' },
+              { backgroundColor: scannedProduct ? '#16A34A' : '#0EA5E9' },
             ]}
           >
             <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '700' }}>✓</Text>
@@ -197,7 +156,7 @@ export default function ConfirmProductScreen() {
             onPress={() => setShowScanner(true)}
           >
             <Text style={styles.ghostButtonText}>
-              {scannedProduct ? 'Scan a different product' : "This isn't my product - Scan QR instead"}
+              {scannedProduct ? 'Scan a different product' : "This isn't my product — Scan QR instead"}
             </Text>
           </TouchableOpacity>
         </View>
@@ -223,38 +182,18 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { flex: 1, paddingHorizontal: Spacing.lg, paddingTop: Spacing.xxl },
 
-  /* Steps */
-  stepRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: Spacing.lg,
-    marginBottom: Spacing.xl,
-    paddingTop: Spacing.lg,
-  },
-  stepItem: { alignItems: 'center' },
-  stepDot: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  stepCheck: {
-    fontSize: 13,
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-
   /* Heading */
   heading: { marginBottom: Spacing.lg },
   headingTitle: {
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: 26,
+    fontWeight: '800',
+    fontFamily: 'Inter',
     color: '#1A1A2E',
     letterSpacing: -0.3,
   },
   headingSub: {
     fontSize: 15,
+    fontFamily: 'Inter',
     color: '#64748B',
     marginTop: Spacing.xs,
     lineHeight: 22,
@@ -265,43 +204,46 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1.5,
-    borderRadius: Radii.md,
-    padding: Spacing.md,
+    borderRadius: Radii.lg,
+    padding: Spacing.md + 2,
     gap: Spacing.md,
     marginBottom: Spacing.md,
-    backgroundColor: '#F0F9FF',
-    borderColor: '#BAE6FD',
+    backgroundColor: '#FFFFFF',
+    ...Shadows.md,
   },
   productIcon: {
     width: 56,
     height: 56,
-    borderRadius: Radii.sm,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
   },
   productInfo: { flex: 1 },
   productName: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
+    fontFamily: 'Inter',
     color: '#1A1A2E',
   },
   productDesc: {
     fontSize: 13,
+    fontFamily: 'Inter',
     color: '#64748B',
     marginTop: 2,
   },
   checkBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     justifyContent: 'center',
     alignItems: 'center',
+    ...Shadows.sm,
   },
 
   /* Info Box */
   infoBox: {
-    borderRadius: Radii.md,
-    padding: Spacing.md,
+    borderRadius: Radii.lg,
+    padding: Spacing.md + 2,
     marginBottom: Spacing.lg,
     backgroundColor: '#F0F9FF',
     borderWidth: 1,
@@ -309,11 +251,13 @@ const styles = StyleSheet.create({
   },
   infoText: {
     fontSize: 14,
+    fontFamily: 'Inter',
     color: '#0C5A8A',
     fontWeight: '500',
   },
   infoSubtext: {
     fontSize: 13,
+    fontFamily: 'Inter',
     color: '#64748B',
     marginTop: 4,
   },
@@ -323,16 +267,19 @@ const styles = StyleSheet.create({
   primaryButton: {
     borderRadius: Radii.md,
     overflow: 'hidden',
+    ...Shadows.glow('#0EA5E9'),
   },
   primaryButtonGradient: {
     paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 54,
+    minHeight: 56,
+    borderRadius: Radii.md,
   },
   primaryButtonText: {
     fontSize: 16,
     fontWeight: '700',
+    fontFamily: 'Inter',
     color: '#FFFFFF',
     letterSpacing: 0.3,
   },
@@ -342,6 +289,8 @@ const styles = StyleSheet.create({
   },
   ghostButtonText: {
     fontSize: 14,
+    fontFamily: 'Inter',
     color: '#64748B',
+    fontWeight: '500',
   },
 });

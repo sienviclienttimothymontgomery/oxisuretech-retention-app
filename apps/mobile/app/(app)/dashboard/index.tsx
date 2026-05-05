@@ -1,336 +1,243 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  ScrollView,
-  ActivityIndicator,
-  Animated,
-  Image,
+  View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView,
+  ActivityIndicator, Animated, Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle } from 'react-native-svg';
 import { Browser } from '@capacitor/browser';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/providers/AuthProvider';
 import { supabase } from '@/lib/supabase';
-import { Colors, Spacing, Radii, Typography, Shadows } from '@/constants/theme';
+import { Colors, Spacing, Radii, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-
 import logoImage from '@/assets/images/logo.png';
 
 type Profile = {
-  user_type: string | null;
-  path_type: string | null;
-  product_sku: string | null;
-  quantity: number | null;
-  onboarding_completed: boolean | null;
+  user_type: string | null; path_type: string | null; product_sku: string | null;
+  quantity: number | null; onboarding_completed: boolean | null;
+  notifications_push: boolean | null; notifications_email: boolean | null; created_at: string | null;
 };
 
-// Simulated data for demo
-const MOCK_DAYS_LEFT = 22;
 const CYCLE_DAYS = 30;
+function computeTimeLeft(createdAt: string | null) {
+  if (!createdAt) return { value: CYCLE_DAYS, label: 'days left', isHours: false, rawDays: CYCLE_DAYS };
+  
+  const elapsedMs = Math.max(0, Date.now() - new Date(createdAt).getTime());
+  const cycleMs = CYCLE_DAYS * 86400000;
+  const msLeft = cycleMs - (elapsedMs % cycleMs);
+  
+  const hoursLeft = Math.ceil(msLeft / 3600000);
+  
+  if (hoursLeft <= 48) {
+    return { 
+      value: hoursLeft, 
+      label: hoursLeft === 1 ? 'hour left' : 'hours left', 
+      isHours: true, 
+      rawDays: Math.ceil(hoursLeft / 24) 
+    };
+  }
+  
+  const daysLeft = Math.ceil(hoursLeft / 24);
+  return { 
+    value: daysLeft, 
+    label: 'days left', 
+    isHours: false, 
+    rawDays: daysLeft 
+  };
+}
 
-function getStatusConfig(daysLeft: number, colors: typeof Colors.light) {
-  if (daysLeft > 7)
-    return { color: colors.success, bg: colors.successBg, label: 'On Track', emoji: '✅' };
-  if (daysLeft > 0)
-    return { color: colors.warning, bg: colors.warningBg, label: 'Due Soon', emoji: '⚠️' };
-  return { color: colors.danger, bg: colors.dangerBg, label: 'Overdue', emoji: '🔴' };
+function getStatusConfig(rawDays: number) {
+  if (rawDays > 7) return { color: '#16A34A', label: 'On Track', emoji: '✅' };
+  if (rawDays > 0) return { color: '#D97706', label: 'Due Soon', emoji: '⚠️' };
+  return { color: '#DC2626', label: 'Overdue', emoji: '🔴' };
 }
 
 export default function DashboardScreen() {
   const { user, signOut } = useAuth();
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
-
+  const navigate = useNavigate();
+  const colors = Colors[useColorScheme() ?? 'light'];
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'self' | 'caregiver'>('self');
 
-  // Animations
-  const headerOpacity = useRef(new Animated.Value(0)).current;
+  const headerOp = useRef(new Animated.Value(0)).current;
   const ringScale = useRef(new Animated.Value(0.8)).current;
-  const ringOpacity = useRef(new Animated.Value(0)).current;
-  const cardsTranslate = useRef(new Animated.Value(30)).current;
-  const cardsOpacity = useRef(new Animated.Value(0)).current;
+  const ringOp = useRef(new Animated.Value(0)).current;
+  const cardsY = useRef(new Animated.Value(30)).current;
+  const cardsOp = useRef(new Animated.Value(0)).current;
 
-  const daysLeft = MOCK_DAYS_LEFT;
-  const status = getStatusConfig(daysLeft, colors);
-  const progress = Math.max(0, Math.min(1, daysLeft / CYCLE_DAYS));
+  const timeLeft = computeTimeLeft(profile?.created_at ?? null);
+  const status = getStatusConfig(timeLeft.rawDays);
+  const progress = Math.max(0, Math.min(1, timeLeft.rawDays / CYCLE_DAYS));
+  const nextDate = (() => { const d = new Date(); d.setDate(d.getDate() + timeLeft.rawDays); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); })();
+
+  const ringSize = 200, sw = 14, r = (ringSize - sw) / 2;
+  const circ = 2 * Math.PI * r, dashOff = circ * (1 - progress);
 
   const handleReorder = async () => {
-    const url = 'https://oxisuretechsolutions.com/products/oxygen-tubing-50-ft-non-kinking-high-flow-hose';
-    try {
-      await Browser.open({ url });
-    } catch (err) {
-      console.error('[Dashboard] Failed to open reorder URL:', err);
-    }
+    try { await Browser.open({ url: 'https://oxisuretechsolutions.com/products/oxygen-tubing-50-ft-non-kinking-high-flow-hose' }); } catch (e) { console.error(e); }
   };
-
-  // Ring dimensions
-  const ringSize = 200;
-  const strokeWidth = 14;
-  const radius = (ringSize - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference * (1 - progress);
 
   useEffect(() => {
     if (!user) return;
-    const fetchProfile = async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+    (async () => {
+      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
       setProfile(data as Profile | null);
       setLoading(false);
-
-      // Entrance animations after data loads
       Animated.stagger(150, [
-        Animated.timing(headerOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.timing(headerOp, { toValue: 1, duration: 400, useNativeDriver: true }),
         Animated.parallel([
           Animated.spring(ringScale, { toValue: 1, tension: 50, friction: 8, useNativeDriver: true }),
-          Animated.timing(ringOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+          Animated.timing(ringOp, { toValue: 1, duration: 500, useNativeDriver: true }),
         ]),
         Animated.parallel([
-          Animated.timing(cardsOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
-          Animated.spring(cardsTranslate, { toValue: 0, tension: 50, friction: 10, useNativeDriver: true }),
+          Animated.timing(cardsOp, { toValue: 1, duration: 400, useNativeDriver: true }),
+          Animated.spring(cardsY, { toValue: 0, tension: 50, friction: 10, useNativeDriver: true }),
         ]),
       ]).start();
-    };
-    fetchProfile();
+    })();
   }, [user]);
 
-  if (loading) {
-    return (
-      <View style={styles.loaderContainer}>
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.bg }]} />
-        <Image
-          source={logoImage}
-          style={{ width: 200, height: 120, marginBottom: 20 }}
-          resizeMode="contain"
-        />
-        <ActivityIndicator size="large" color="#38BDF8" />
-      </View>
-    );
-  }
+  if (loading) return (
+    <View style={s.loader}><View style={[StyleSheet.absoluteFill, { backgroundColor: colors.bg }]} />
+      <Image source={logoImage} style={{ width: 200, height: 120, marginBottom: 20 }} resizeMode="contain" />
+      <ActivityIndicator size="large" color="#0EA5E9" />
+    </View>
+  );
 
   const isCaregiver = profile?.user_type === 'caregiver';
-  const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
-  const avatarInitial = displayName.charAt(0).toUpperCase();
+  const fullName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
+  const firstName = fullName.split(' ')[0];
+  const avatarInitial = fullName.charAt(0).toUpperCase();
 
   return (
-    <View style={styles.container}>
+    <View style={s.container}>
       <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.bg }]} />
+      <View style={[s.orb, s.orbTR]} /><View style={[s.orb, s.orbBL]} />
 
-      <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <SafeAreaView style={s.safe}>
+        <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
           {/* Header */}
-          <Animated.View style={[styles.header, { opacity: headerOpacity }]}>
-            <View style={styles.headerLeft}>
-              <View style={styles.avatar}>
-                <LinearGradient
-                  colors={['#38BDF8', '#0EA5E9']}
-                  style={styles.avatarGradient}
-                >
-                  <Text style={styles.avatarText}>{avatarInitial}</Text>
+          <Animated.View style={[s.header, { opacity: headerOp }]}>
+            <View style={s.headerLeft}>
+              <View style={s.avatar}>
+                <LinearGradient colors={['#38BDF8', '#0284C7']} style={s.avatarGrad}>
+                  <Text style={s.avatarText}>{avatarInitial}</Text>
                 </LinearGradient>
               </View>
-              <View>
-                <Text style={styles.greeting}>Hello, {displayName} 👋</Text>
-                <Text style={styles.email}>{user?.email}</Text>
+              <View style={s.headerInfo}>
+                <Text style={s.greeting} numberOfLines={1}>Hello, {firstName} 👋</Text>
+                <Text style={s.email} numberOfLines={1}>{user?.email}</Text>
               </View>
             </View>
-            <TouchableOpacity
-              style={styles.signOutBtn}
-              onPress={signOut}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.signOutText}>Sign Out</Text>
-            </TouchableOpacity>
+            <View style={s.headerActions}>
+              <TouchableOpacity style={s.settingsBtn} onPress={() => navigate('/(app)/settings')} activeOpacity={0.7}>
+                <Text style={{ fontSize: 18 }}>⚙️</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.signOutBtn} onPress={signOut} activeOpacity={0.7}>
+                <Text style={s.signOutText}>Sign Out</Text>
+              </TouchableOpacity>
+            </View>
           </Animated.View>
 
           {/* Caregiver Toggle */}
           {isCaregiver && (
-            <View style={styles.segmentedControl}>
-              <TouchableOpacity
-                style={[
-                  styles.segment,
-                  viewMode === 'self' && styles.segmentActive,
-                ]}
-                onPress={() => setViewMode('self')}
-              >
-                <Text
-                  style={[
-                    styles.segmentText,
-                    viewMode === 'self' && styles.segmentTextActive,
-                  ]}
-                >
-                  My Tracker
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.segment,
-                  viewMode === 'caregiver' && styles.segmentActive,
-                ]}
-                onPress={() => setViewMode('caregiver')}
-              >
-                <Text
-                  style={[
-                    styles.segmentText,
-                    viewMode === 'caregiver' && styles.segmentTextActive,
-                  ]}
-                >
-                  People I Manage
-                </Text>
-              </TouchableOpacity>
+            <View style={s.segControl}>
+              {['self', 'caregiver'].map(m => (
+                <TouchableOpacity key={m} style={[s.seg, viewMode === m && s.segActive]} onPress={() => setViewMode(m as any)}>
+                  <Text style={[s.segText, viewMode === m && s.segTextActive]}>{m === 'self' ? 'My Tracker' : 'People I Manage'}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
           )}
 
-          {viewMode === 'self' ? (
-            <>
-              {/* Status Ring */}
-              <Animated.View
-                style={[
-                  styles.ringContainer,
-                  {
-                    transform: [{ scale: ringScale }],
-                    opacity: ringOpacity,
-                  },
-                ]}
-              >
-                <View style={styles.ringGlassCard}>
-                  <Svg width={ringSize} height={ringSize} style={styles.ringSvg}>
-                    {/* Background ring */}
-                    <Circle
-                      cx={ringSize / 2}
-                      cy={ringSize / 2}
-                      r={radius}
-                      stroke="#E2E8F0"
-                      strokeWidth={strokeWidth}
-                      fill="transparent"
-                    />
-                    {/* Progress ring */}
-                    <Circle
-                      cx={ringSize / 2}
-                      cy={ringSize / 2}
-                      r={radius}
-                      stroke={status.color}
-                      strokeWidth={strokeWidth}
-                      fill="transparent"
-                      strokeDasharray={`${circumference}`}
-                      strokeDashoffset={strokeDashoffset}
-                      strokeLinecap="round"
-                      rotation="-90"
-                      origin={`${ringSize / 2}, ${ringSize / 2}`}
-                    />
-                  </Svg>
-                  <View style={styles.ringCenter}>
-                    <Text style={[styles.ringDays, { color: status.color }]}>{daysLeft}</Text>
-                    <Text style={styles.ringLabel}>days left</Text>
-                  </View>
+          {viewMode === 'self' ? (<>
+            {/* Status Ring */}
+            <Animated.View style={[s.ringContainer, { transform: [{ scale: ringScale }], opacity: ringOp }]}>
+              <View style={s.ringCard}>
+                <Svg width={ringSize} height={ringSize} style={s.ringSvg}>
+                  <Circle cx={ringSize/2} cy={ringSize/2} r={r} stroke="#E2E8F0" strokeWidth={sw} fill="transparent" />
+                  <Circle cx={ringSize/2} cy={ringSize/2} r={r} stroke={status.color} strokeWidth={sw} fill="transparent"
+                    strokeDasharray={`${circ}`} strokeDashoffset={dashOff} strokeLinecap="round" rotation="-90" origin={`${ringSize/2}, ${ringSize/2}`} />
+                </Svg>
+                <View style={s.ringCenter}>
+                  <Text style={[s.ringDays, { color: status.color }]}>{timeLeft.value}</Text>
+                  <Text style={s.ringLabel}>{timeLeft.label}</Text>
                 </View>
+              </View>
+              <View style={[s.statusBadge, { backgroundColor: status.color + '14', borderColor: status.color + '30' }]}>
+                <Text style={{ fontSize: 16 }}>{status.emoji}</Text>
+                <Text style={[s.statusLabel, { color: status.color }]}>{status.label}</Text>
+                <Text style={[s.statusSub, { color: status.color }]}>Next replacement on {nextDate}</Text>
+              </View>
+            </Animated.View>
 
-                {/* Status Badge */}
-                <View style={[styles.statusBadge, { backgroundColor: status.color + '18' }]}>
-                  <Text style={{ fontSize: 16 }}>{status.emoji}</Text>
-                  <Text style={[styles.statusLabel, { color: status.color }]}>{status.label}</Text>
-                  <Text style={[styles.statusSub, { color: status.color }]}>
-                    Next replacement in {daysLeft} days
+            {/* Cards */}
+            <Animated.View style={{ opacity: cardsOp, transform: [{ translateY: cardsY }] }}>
+              {/* Reorder CTA */}
+              <TouchableOpacity style={s.reorderCard} activeOpacity={0.85} onPress={handleReorder}>
+                <LinearGradient colors={['#0EA5E9', '#0284C7', '#0369A1']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.reorderGrad}>
+                  <View style={s.reorderContent}>
+                    <View style={s.reorderBadge}><Text style={s.reorderBadgeText}>🎉 SAVE 10%</Text></View>
+                    <Text style={s.reorderTitle}>Ready to Reorder?</Text>
+                    <Text style={s.reorderSub}>Get your replacement supplies with an early reorder discount</Text>
+                    <View style={s.reorderButton}><Text style={s.reorderButtonText}>Order Now →</Text></View>
+                  </View>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              {/* Detail Cards */}
+              <View style={s.detailsRow}>
+                <View style={s.detailCard}>
+                  <View style={[s.detailIconC, { backgroundColor: '#0EA5E9' + '12' }]}><Text style={{ fontSize: 24 }}>🫁</Text></View>
+                  <Text style={s.detailTitle}>Product</Text>
+                  <Text style={s.detailValue}>{profile?.product_sku || 'Standard Tubing'}</Text>
+                  <Text style={s.detailMuted}>Qty: {profile?.quantity || 1}</Text>
+                </View>
+                <View style={s.detailCard}>
+                  <View style={[s.detailIconC, { backgroundColor: '#8B5CF6' + '12' }]}><Text style={{ fontSize: 24 }}>🔔</Text></View>
+                  <Text style={s.detailTitle}>Reminders</Text>
+                  <Text style={[s.detailValue, { color: profile?.notifications_push !== false ? '#16A34A' : '#94A3B8' }]}>
+                    Push: {profile?.notifications_push !== false ? 'Active' : 'Off'}
                   </Text>
-                </View>
-              </Animated.View>
-
-              {/* Action Cards */}
-              <Animated.View
-                style={{
-                  opacity: cardsOpacity,
-                  transform: [{ translateY: cardsTranslate }],
-                }}
-              >
-                {/* Reorder CTA */}
-                <TouchableOpacity style={styles.reorderCard} activeOpacity={0.85} onPress={handleReorder}>
-                  <LinearGradient
-                    colors={['#0EA5E9', '#0284C7', '#0369A1']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.reorderGradient}
-                  >
-                    <View style={styles.reorderContent}>
-                      <View style={styles.reorderBadge}>
-                        <Text style={styles.reorderBadgeText}>🎉 SAVE 10%</Text>
-                      </View>
-                      <Text style={styles.reorderTitle}>Ready to Reorder?</Text>
-                      <Text style={styles.reorderSub}>
-                        Get your replacement supplies with an early reorder discount
-                      </Text>
-                      <View style={styles.reorderButton}>
-                        <Text style={styles.reorderButtonText}>Order Now →</Text>
-                      </View>
-                    </View>
-                  </LinearGradient>
-                </TouchableOpacity>
-
-                {/* Detail Cards */}
-                <View style={styles.detailsRow}>
-                  <View style={styles.detailCard}>
-                    <View style={styles.detailIconContainer}>
-                      <Text style={{ fontSize: 24 }}>🫁</Text>
-                    </View>
-                    <Text style={styles.detailTitle}>Product</Text>
-                    <Text style={styles.detailValue}>
-                      {profile?.product_sku || 'OXI-TUB-07'}
-                    </Text>
-                    <Text style={styles.detailMuted}>
-                      Qty: {profile?.quantity || 1}
-                    </Text>
-                  </View>
-                  <View style={styles.detailCard}>
-                    <View style={styles.detailIconContainer}>
-                      <Text style={{ fontSize: 24 }}>🔔</Text>
-                    </View>
-                    <Text style={styles.detailTitle}>Reminders</Text>
-                    <Text style={[styles.detailValue, { color: '#4ADE80' }]}>
-                      Push: Active
-                    </Text>
-                    <Text style={[styles.detailMuted, { color: '#4ADE80' }]}>
-                      Email: Active
-                    </Text>
-                  </View>
-                </View>
-              </Animated.View>
-            </>
-          ) : (
-            /* Caregiver View */
-            <Animated.View
-              style={[
-                styles.caregiverView,
-                {
-                  opacity: cardsOpacity,
-                  transform: [{ translateY: cardsTranslate }],
-                },
-              ]}
-            >
-              <View style={styles.caregiverCard}>
-                <View style={styles.caregiverAvatar}>
-                  <Text style={{ fontSize: 20 }}>👤</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.caregiverName}>Mom</Text>
-                  <Text style={styles.caregiverRole}>Parent</Text>
-                </View>
-                <View style={styles.miniStatus}>
-                  <View style={[styles.miniDot, { backgroundColor: '#4ADE80' }]} />
-                  <Text style={[styles.miniStatusText, { color: '#4ADE80' }]}>On Track</Text>
+                  <Text style={[s.detailMuted, { color: profile?.notifications_email !== false ? '#16A34A' : '#94A3B8' }]}>
+                    Email: {profile?.notifications_email !== false ? 'Active' : 'Off'}
+                  </Text>
                 </View>
               </View>
 
-              <TouchableOpacity style={styles.addDependentBtn} activeOpacity={0.7}>
-                <Text style={styles.addDependentText}>+ Add Another Person</Text>
-              </TouchableOpacity>
+              {/* Tracker Details */}
+              <View style={s.trackerSection}>
+                <Text style={s.trackerSTitle}>Tracker Details</Text>
+                <View style={s.trackerCard}>
+                  {[
+                    ['Account', user?.email || '—'],
+                    ['Workspace', profile?.path_type || 'App'],
+                    ['Product SKU', profile?.product_sku || 'Standard Tubing'],
+                    ['Next Replacement', nextDate],
+                    ['Quantity', `${profile?.quantity || 1} Tube(s)`],
+                  ].map(([label, value], i) => (
+                    <View key={label} style={[s.trackerRow, i > 0 && s.trackerRowBorder]}>
+                      <Text style={s.trackerLabel}>{label}</Text>
+                      {['Workspace', 'Product SKU', 'Quantity'].includes(label as string) ? (
+                        <View style={s.trackerBadge}><Text style={s.trackerBadgeText}>{value}</Text></View>
+                      ) : (
+                        <Text style={s.trackerValue} numberOfLines={1}>{value}</Text>
+                      )}
+                    </View>
+                  ))}
+                </View>
+              </View>
+            </Animated.View>
+          </>) : (
+            <Animated.View style={[s.caregiverView, { opacity: cardsOp, transform: [{ translateY: cardsY }] }]}>
+              <View style={s.caregiverCard}>
+                <View style={s.caregiverAvatar}><Text style={{ fontSize: 20 }}>👤</Text></View>
+                <View style={{ flex: 1 }}><Text style={s.caregiverName}>Mom</Text><Text style={s.caregiverRole}>Parent</Text></View>
+                <View style={s.miniStatus}><View style={[s.miniDot, { backgroundColor: '#16A34A' }]} /><Text style={[s.miniStatusText, { color: '#16A34A' }]}>On Track</Text></View>
+              </View>
+              <TouchableOpacity style={s.addBtn} activeOpacity={0.7}><Text style={s.addBtnText}>+ Add Another Person</Text></TouchableOpacity>
             </Animated.View>
           )}
         </ScrollView>
@@ -339,318 +246,78 @@ export default function DashboardScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  safeArea: { flex: 1 },
+const s = StyleSheet.create({
+  container: { flex: 1 }, loader: { flex: 1, justifyContent: 'center', alignItems: 'center' }, safe: { flex: 1 },
+  orb: { position: 'absolute', borderRadius: 9999 },
+  orbTR: { width: 280, height: 280, backgroundColor: '#38BDF8', opacity: 0.04, top: -100, right: -100 },
+  orbBL: { width: 220, height: 220, backgroundColor: '#0EA5E9', opacity: 0.05, bottom: -80, left: -100 },
+  scroll: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: Spacing.xxl },
 
-  /* Orbs */
-  orbContainer: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
-  orb: { position: 'absolute', borderRadius: 9999, opacity: 0.06 },
-  orbTopRight: { width: 300, height: 300, backgroundColor: '#38BDF8', top: -100, right: -100 },
-  orbBottomLeft: { width: 250, height: 250, backgroundColor: '#0EA5E9', bottom: -80, left: -100 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.lg },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, flex: 1, flexShrink: 1, marginRight: Spacing.sm },
+  headerInfo: { flex: 1, flexShrink: 1 },
+  avatar: { width: 48, height: 48, borderRadius: 24, overflow: 'hidden', flexShrink: 0, ...Shadows.glow('#0EA5E9') },
+  avatarGrad: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  avatarText: { fontSize: 20, fontWeight: '700', fontFamily: 'Inter', color: '#FFF' },
+  greeting: { fontSize: 17, fontWeight: '700', fontFamily: 'Inter', color: '#1A1A2E' },
+  email: { fontSize: 12, fontFamily: 'Inter', color: '#475569', marginTop: 1 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  settingsBtn: { width: 42, height: 42, borderRadius: 21, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center', ...Shadows.sm },
+  signOutBtn: { borderWidth: 1, borderColor: '#FECACA', borderRadius: Radii.sm, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, backgroundColor: '#FEF2F2' },
+  signOutText: { fontSize: 13, fontFamily: 'Inter', color: '#DC2626', fontWeight: '600' },
 
-  scrollContent: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.lg,
-    paddingBottom: Spacing.xxl,
-  },
+  segControl: { flexDirection: 'row', borderRadius: Radii.md, padding: 3, marginBottom: Spacing.lg, backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#E2E8F0' },
+  seg: { flex: 1, paddingVertical: 10, borderRadius: Radii.sm, alignItems: 'center' },
+  segActive: { backgroundColor: '#FFF', ...Shadows.sm },
+  segText: { fontSize: 14, fontWeight: '500', fontFamily: 'Inter', color: '#475569' },
+  segTextActive: { fontWeight: '700', color: '#0C5A8A' },
 
-  /* Header */
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.lg,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-  },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    overflow: 'hidden',
-  },
-  avatarGradient: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  greeting: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#1A1A2E',
-  },
-  email: {
-    fontSize: 12,
-    color: '#475569',
-    marginTop: 1,
-  },
-  signOutBtn: {
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: Radii.sm,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    backgroundColor: '#FFFFFF',
-  },
-  signOutText: {
-    fontSize: 13,
-    color: '#DC2626',
-    fontWeight: '600',
-  },
+  ringContainer: { alignItems: 'center', marginBottom: Spacing.lg },
+  ringCard: { width: 224, height: 224, borderRadius: 112, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF', borderWidth: 1, borderColor: '#E2E8F0', marginBottom: Spacing.md, ...Shadows.md },
+  ringSvg: { position: 'absolute' },
+  ringCenter: { alignItems: 'center', justifyContent: 'center' },
+  ringDays: { fontSize: 48, fontWeight: '800', fontFamily: 'Inter', fontVariant: ['tabular-nums'] },
+  ringLabel: { fontSize: 14, fontFamily: 'Inter', color: '#475569', fontWeight: '500' },
 
-  /* Segmented Control */
-  segmentedControl: {
-    flexDirection: 'row',
-    borderRadius: Radii.sm,
-    padding: 3,
-    marginBottom: Spacing.lg,
-    backgroundColor: '#E2E8F0',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  segment: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: Radii.sm - 2,
-    alignItems: 'center',
-  },
-  segmentActive: {
-    backgroundColor: '#FFFFFF',
-    ...Shadows.sm,
-  },
-  segmentText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#475569',
-  },
-  segmentTextActive: {
-    fontWeight: '600',
-    color: '#0C5A8A',
-  },
+  statusBadge: { borderRadius: Radii.lg, paddingVertical: 10, paddingHorizontal: Spacing.lg, alignItems: 'center', gap: 2, borderWidth: 1 },
+  statusLabel: { fontSize: 16, fontWeight: '700', fontFamily: 'Inter' },
+  statusSub: { fontSize: 13, fontFamily: 'Inter', opacity: 0.8 },
 
-  /* Ring */
-  ringContainer: {
-    alignItems: 'center',
-    marginBottom: Spacing.lg,
-  },
-  ringGlassCard: {
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    marginBottom: Spacing.md,
-    ...Shadows.sm,
-  },
-  ringSvg: {
-    position: 'absolute',
-  },
-  ringCenter: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ringDays: {
-    fontSize: 48,
-    fontWeight: '800',
-    fontVariant: ['tabular-nums'],
-    color: '#1A1A2E',
-  },
-  ringLabel: {
-    fontSize: 14,
-    color: '#475569',
-    fontWeight: '500',
-  },
+  reorderCard: { borderRadius: Radii.xl, overflow: 'hidden', marginBottom: Spacing.lg, ...Shadows.xl },
+  reorderGrad: { borderRadius: Radii.xl },
+  reorderContent: { padding: Spacing.lg },
+  reorderBadge: { alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: Spacing.sm + 4, paddingVertical: 5, borderRadius: Radii.full, marginBottom: Spacing.sm },
+  reorderBadgeText: { fontSize: 11, fontWeight: '700', fontFamily: 'Inter', color: '#FFF', letterSpacing: 0.5 },
+  reorderTitle: { fontSize: 21, fontWeight: '800', fontFamily: 'Inter', color: '#FFF', marginBottom: 4 },
+  reorderSub: { fontSize: 14, fontFamily: 'Inter', color: 'rgba(255,255,255,0.9)', lineHeight: 20 },
+  reorderButton: { alignSelf: 'flex-start', paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm + 4, borderRadius: Radii.sm, marginTop: Spacing.md, backgroundColor: 'rgba(255,255,255,0.22)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
+  reorderButtonText: { fontSize: 14, fontWeight: '700', fontFamily: 'Inter', color: '#FFF' },
 
-  /* Status Badge */
-  statusBadge: {
-    borderRadius: Radii.md,
-    paddingVertical: 10,
-    paddingHorizontal: Spacing.lg,
-    alignItems: 'center',
-    gap: 2,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
-  },
-  statusLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  statusSub: {
-    fontSize: 13,
-    opacity: 0.8,
-  },
+  detailsRow: { flexDirection: 'row', gap: Spacing.md },
+  detailCard: { flex: 1, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFF', borderRadius: Radii.lg, padding: Spacing.md, alignItems: 'center', ...Shadows.md },
+  detailIconC: { width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.sm },
+  detailTitle: { fontSize: 14, fontWeight: '700', fontFamily: 'Inter', color: '#1A1A2E', marginBottom: 2 },
+  detailValue: { fontSize: 13, fontFamily: 'Inter', color: '#475569', marginTop: 2 },
+  detailMuted: { fontSize: 13, fontFamily: 'Inter', color: '#94A3B8' },
 
-  /* Reorder CTA */
-  reorderCard: {
-    borderRadius: Radii.lg,
-    overflow: 'hidden',
-    marginBottom: Spacing.lg,
-    ...Shadows.md,
-  },
-  reorderGradient: {
-    borderRadius: Radii.lg,
-  },
-  reorderContent: {
-    padding: Spacing.lg,
-  },
-  reorderBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    paddingHorizontal: Spacing.sm + 2,
-    paddingVertical: 4,
-    borderRadius: Radii.full,
-    marginBottom: Spacing.sm,
-  },
-  reorderBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
-  },
-  reorderTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 4,
-  },
-  reorderSub: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.9)',
-    lineHeight: 20,
-  },
-  reorderButton: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm + 2,
-    borderRadius: Radii.sm,
-    marginTop: Spacing.md,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
-  },
-  reorderButtonText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
+  trackerSection: { marginTop: Spacing.lg },
+  trackerSTitle: { fontSize: 13, fontWeight: '700', fontFamily: 'Inter', color: '#1A1A2E', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: Spacing.md, paddingLeft: 2 },
+  trackerCard: { backgroundColor: '#FFF', borderRadius: Radii.lg, borderWidth: 1, borderColor: '#E2E8F0', padding: Spacing.md, ...Shadows.sm },
+  trackerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: Spacing.sm },
+  trackerRowBorder: { borderTopWidth: 1, borderTopColor: '#F1F5F9', marginTop: Spacing.sm, paddingTop: Spacing.md },
+  trackerLabel: { fontSize: 14, fontFamily: 'Inter', color: '#475569', fontWeight: '500' },
+  trackerValue: { fontSize: 14, fontWeight: '600', fontFamily: 'Inter', color: '#1A1A2E', maxWidth: 200 },
+  trackerBadge: { backgroundColor: '#F1F5F9', paddingHorizontal: Spacing.md, paddingVertical: 4, borderRadius: Radii.full },
+  trackerBadgeText: { fontSize: 13, fontWeight: '600', fontFamily: 'Inter', color: '#1A1A2E', textTransform: 'capitalize' },
 
-  /* Detail Cards */
-  detailsRow: {
-    flexDirection: 'row',
-    gap: Spacing.md,
-  },
-  detailCard: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
-    borderRadius: Radii.md,
-    padding: Spacing.md,
-    alignItems: 'center',
-    ...Shadows.sm,
-  },
-  detailIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: Radii.sm,
-    backgroundColor: '#F0F9FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-  },
-  detailTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1A1A2E',
-    marginBottom: 2,
-  },
-  detailValue: {
-    fontSize: 13,
-    color: '#475569',
-    marginTop: 2,
-  },
-  detailMuted: {
-    fontSize: 13,
-    color: '#94A3B8',
-  },
-
-  /* Caregiver View */
-  caregiverView: {
-    gap: Spacing.md,
-    marginTop: Spacing.md,
-  },
-  caregiverCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
-    borderRadius: Radii.md,
-    padding: Spacing.md,
-    gap: Spacing.md,
-    ...Shadows.sm,
-  },
-  caregiverAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#F0F9FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  caregiverName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#1A1A2E',
-  },
-  caregiverRole: {
-    fontSize: 13,
-    color: '#475569',
-  },
-  miniStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 4,
-    borderRadius: Radii.full,
-    backgroundColor: 'rgba(74, 222, 128, 0.12)',
-    gap: 4,
-  },
-  miniDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  miniStatusText: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  addDependentBtn: {
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: '#0EA5E9',
-    borderRadius: Radii.md,
-    paddingVertical: Spacing.md,
-    alignItems: 'center',
-    backgroundColor: '#F0F9FF',
-  },
-  addDependentText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#0C5A8A',
-  },
+  caregiverView: { gap: Spacing.md, marginTop: Spacing.md },
+  caregiverCard: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#FFF', borderRadius: Radii.lg, padding: Spacing.md, gap: Spacing.md, ...Shadows.md },
+  caregiverAvatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#F0F9FF', justifyContent: 'center', alignItems: 'center' },
+  caregiverName: { fontSize: 16, fontWeight: '600', fontFamily: 'Inter', color: '#1A1A2E' },
+  caregiverRole: { fontSize: 13, fontFamily: 'Inter', color: '#475569' },
+  miniStatus: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.sm, paddingVertical: 4, borderRadius: Radii.full, backgroundColor: 'rgba(22, 163, 74, 0.1)', gap: 4 },
+  miniDot: { width: 8, height: 8, borderRadius: 4 },
+  miniStatusText: { fontSize: 13, fontWeight: '600', fontFamily: 'Inter' },
+  addBtn: { borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#0EA5E9', borderRadius: Radii.lg, paddingVertical: Spacing.md, alignItems: 'center', backgroundColor: '#F0F9FF' },
+  addBtnText: { fontSize: 16, fontWeight: '600', fontFamily: 'Inter', color: '#0C5A8A' },
 });
