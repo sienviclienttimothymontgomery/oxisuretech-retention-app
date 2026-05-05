@@ -112,7 +112,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const navigateAfterAuth = useCallback(async (newSession: Session | null) => {
     if (!newSession?.user) return;
+    
+    // Explicitly update React session state so the route guard doesn't kick us out!
+    setSession(newSession);
+    
     const admin = checkAdminStatus(newSession.user.email);
+    setIsAdmin(admin);
+    
     if (admin) {
       navigate('/(app)/admin', { replace: true });
     } else {
@@ -121,10 +127,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localCompletedStr = localStorage.getItem(`onboarding_completed_${newSession.user.id}`) || 'false';
       } catch(e) {}
       
-      const { data: profile } = await supabase.from('profiles').select('onboarding_completed').eq('id', newSession.user.id).single();
-      const hasCompleted = profile?.onboarding_completed || localCompletedStr === 'true';
-      handleSetOnboardingCompleted(hasCompleted);
-      navigate(hasCompleted ? '/(app)/dashboard' : '/(onboarding)/welcome', { replace: true });
+      try {
+        const profilePromise = supabase.from('profiles').select('onboarding_completed').eq('id', newSession.user.id).single();
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Profile fetch timeout')), 3000));
+        const { data: profile } = await Promise.race([profilePromise, timeoutPromise]) as any;
+        const hasCompleted = profile?.onboarding_completed || localCompletedStr === 'true';
+        handleSetOnboardingCompleted(hasCompleted);
+        navigate(hasCompleted ? '/(app)/dashboard' : '/(onboarding)/welcome', { replace: true });
+      } catch (e) {
+        console.warn('OAuth profile fetch timed out or failed, relying on local state');
+        const hasCompleted = localCompletedStr === 'true';
+        handleSetOnboardingCompleted(hasCompleted);
+        navigate(hasCompleted ? '/(app)/dashboard' : '/(onboarding)/welcome', { replace: true });
+      }
     }
   }, [navigate]);
 
