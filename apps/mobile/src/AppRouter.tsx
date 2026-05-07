@@ -1,5 +1,5 @@
 import React from 'react';
-import { HashRouter, Routes, Route } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from '../providers/AuthProvider';
 
 import IndexScreen from '../app/index';
@@ -28,6 +28,8 @@ export default function AppRouter() {
           <Route path="/(onboarding)/confirm-product" element={<OnboardingConfirmProductScreen />} />
           <Route path="/(onboarding)/quantity" element={<OnboardingQuantityScreen />} />
           <Route path="/(onboarding)/notifications" element={<OnboardingNotificationsScreen />} />
+          {/* Catch-all: redirect unknown paths to root */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>
     </HashRouter>

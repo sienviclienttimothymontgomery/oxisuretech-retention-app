@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView,
-  ActivityIndicator, Animated, Image,
+  ActivityIndicator, Animated, Image, Switch, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigate } from 'react-router-dom';
@@ -23,6 +23,8 @@ export default function SettingsScreen() {
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [pushOn, setPushOn] = useState(true);
+  const [emailOn, setEmailOn] = useState(true);
   const fadeIn = useRef(new Animated.Value(0)).current;
   const slideUp = useRef(new Animated.Value(20)).current;
 
@@ -30,7 +32,12 @@ export default function SettingsScreen() {
     if (!user) return;
     (async () => {
       const { data } = await supabase.from('profiles').select('quantity, product_sku, notifications_push, notifications_email').eq('id', user.id).single();
-      if (data) { setProfile(data as Profile); setQuantity(data.quantity ?? 1); }
+      if (data) {
+        setProfile(data as Profile);
+        setQuantity(data.quantity ?? 1);
+        setPushOn(data.notifications_push !== false);
+        setEmailOn(data.notifications_email !== false);
+      }
       setLoading(false);
       Animated.parallel([
         Animated.timing(fadeIn, { toValue: 1, duration: 500, useNativeDriver: true }),
@@ -42,7 +49,7 @@ export default function SettingsScreen() {
   const handleSave = async () => {
     if (!user) return;
     setSaving(true); setSuccessMsg(null); setErrorMsg(null);
-    const { error } = await supabase.from('profiles').update({ quantity }).eq('id', user.id);
+    const { error } = await supabase.from('profiles').update({ quantity, notifications_push: pushOn, notifications_email: emailOn }).eq('id', user.id);
     setSaving(false);
     if (error) { setErrorMsg(error.message); } else { setSuccessMsg('Settings updated successfully'); setTimeout(() => setSuccessMsg(null), 3000); }
   };
@@ -100,22 +107,26 @@ export default function SettingsScreen() {
           </Animated.View>
 
           <Animated.View style={[s.configSection, { opacity: fadeIn, transform: [{ translateY: slideUp }] }]}>
-            <Text style={s.sectionLabel}>Current Configuration</Text>
+            <Text style={s.sectionLabel}>Notification Preferences</Text>
             <View style={s.configCard}>
-              {[
-                ['Product SKU', profile?.product_sku || 'Standard Tubing', 'badge'],
-                ['Push Notifications', profile?.notifications_push !== false ? 'On' : 'Off', 'status', profile?.notifications_push !== false ? '#16A34A' : '#94A3B8'],
-                ['Email Reminders', profile?.notifications_email !== false ? 'On' : 'Off', 'status', profile?.notifications_email !== false ? '#16A34A' : '#94A3B8'],
-              ].map(([label, value, type, statusColor], i) => (
-                <View key={label as string} style={[s.configRow, i > 0 && s.configRowBorder]}>
-                  <Text style={s.configLabel}>{label}</Text>
-                  {type === 'badge' ? (
-                    <View style={s.configBadge}><Text style={s.configBadgeText}>{value}</Text></View>
-                  ) : (
-                    <View style={[s.statusDot, { backgroundColor: statusColor as string }]}><Text style={s.statusDotText}>{value}</Text></View>
-                  )}
-                </View>
-              ))}
+              <View style={s.configRow}>
+                <Text style={s.configLabel}>Push Notifications</Text>
+                <Switch value={pushOn} onValueChange={setPushOn} trackColor={{ false: '#E2E8F0', true: '#0EA5E9' }} thumbColor={Platform.OS === 'android' ? '#FFFFFF' : undefined} />
+              </View>
+              <View style={[s.configRow, s.configRowBorder]}>
+                <Text style={s.configLabel}>Email Reminders</Text>
+                <Switch value={emailOn} onValueChange={setEmailOn} trackColor={{ false: '#E2E8F0', true: '#0EA5E9' }} thumbColor={Platform.OS === 'android' ? '#FFFFFF' : undefined} />
+              </View>
+            </View>
+          </Animated.View>
+
+          <Animated.View style={[s.configSection, { opacity: fadeIn, transform: [{ translateY: slideUp }] }]}>
+            <Text style={s.sectionLabel}>Product Info</Text>
+            <View style={s.configCard}>
+              <View style={s.configRow}>
+                <Text style={s.configLabel}>Product SKU</Text>
+                <View style={s.configBadge}><Text style={s.configBadgeText}>{profile?.product_sku || 'Standard Tubing'}</Text></View>
+              </View>
             </View>
           </Animated.View>
         </ScrollView>

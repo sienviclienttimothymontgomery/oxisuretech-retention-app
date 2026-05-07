@@ -15,6 +15,8 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Rect, Circle as SvgCircle } from 'react-native-svg';
+import { Browser } from '@capacitor/browser';
+import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/AuthProvider';
 import { Colors, Spacing, Radii, Typography, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -137,6 +139,23 @@ export default function LoginScreen() {
     setLoading(false);
   };
 
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      setError('Please enter your email address first.');
+      return;
+    }
+    setError(null);
+    setMessage(null);
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: 'com.anonymous.oxisuretechmobile://login-callback',
+    });
+    if (resetError) {
+      setError(resetError.message);
+    } else {
+      setMessage('Check your email for a password reset link.');
+    }
+  };
+
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
     setError(null);
@@ -148,6 +167,10 @@ export default function LoginScreen() {
       setError(googleError.message);
     }
     setGoogleLoading(false);
+  };
+
+  const openLink = (url: string) => {
+    Browser.open({ url }).catch(console.error);
   };
 
   const logoSpin = logoRotate.interpolate({
@@ -317,7 +340,7 @@ export default function LoginScreen() {
 
             {/* Forgot Password */}
             {!isSignUp && (
-              <TouchableOpacity style={styles.forgotButton}>
+              <TouchableOpacity style={styles.forgotButton} onPress={handleForgotPassword}>
                 <Text style={styles.forgotText}>Forgot password?</Text>
               </TouchableOpacity>
             )}
@@ -420,8 +443,8 @@ export default function LoginScreen() {
           {/* Footer */}
           <Text style={styles.footerText}>
             By continuing, you agree to our{' '}
-            <Text style={styles.footerLink}>Terms</Text> &{' '}
-            <Text style={styles.footerLink}>Privacy Policy</Text>
+            <Text style={styles.footerLink} onPress={() => openLink('https://oxisuretechsolutions.com/terms')}>Terms</Text> &{' '}
+            <Text style={styles.footerLink} onPress={() => openLink('https://oxisuretechsolutions.com/privacy')}>Privacy Policy</Text>
           </Text>
         </ScrollView>
       </KeyboardAvoidingView>

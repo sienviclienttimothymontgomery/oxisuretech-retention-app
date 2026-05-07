@@ -22,16 +22,19 @@ SET is_admin = true,
     onboarding_completed = true
 WHERE id = (SELECT id FROM auth.users WHERE email = 'admin@oxisuretech.com');
 
--- 5. Add RLS policy so admin can view all profiles
+-- 5. Create a secure function to check admin status without triggering RLS
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN AS $$
+  SELECT is_admin FROM public.profiles WHERE id = auth.uid();
+$$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
+
+-- 6. Add RLS policy so admin can view all profiles
+DROP POLICY IF EXISTS "Admins can view all profiles" ON public.profiles;
 CREATE POLICY "Admins can view all profiles"
   ON public.profiles FOR SELECT
   USING (
     auth.uid() = id 
-    OR 
-    EXISTS (
-      SELECT 1 FROM public.profiles p 
-      WHERE p.id = auth.uid() AND p.is_admin = true
-    )
+    OR public.is_admin()
   );
 
 -- Verify: check admin was set up correctly

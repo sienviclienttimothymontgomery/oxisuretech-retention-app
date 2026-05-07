@@ -25,6 +25,7 @@ export default function UserTypeScreen() {
 
   const [userType, setUserType] = useState<string>('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Animations
   const fadeIn = useRef(new Animated.Value(0)).current;
@@ -41,6 +42,7 @@ export default function UserTypeScreen() {
 
   const handleCardPress = (type: string, scaleRef: Animated.Value) => {
     setUserType(type);
+    setError(null);
     Animated.sequence([
       Animated.timing(scaleRef, { toValue: 0.97, duration: 100, useNativeDriver: true }),
       Animated.spring(scaleRef, { toValue: 1, tension: 200, friction: 10, useNativeDriver: true }),
@@ -50,10 +52,18 @@ export default function UserTypeScreen() {
   const handleContinue = async () => {
     if (!userType || !user) return;
     setLoading(true);
+    setError(null);
 
-    await supabase
+    const { error: dbError } = await supabase
       .from('profiles')
       .upsert({ id: user.id, user_type: userType, path_type: 'app' });
+
+    if (dbError) {
+      console.error('[UserType] DB error:', dbError);
+      setError('Failed to save your selection. Please try again.');
+      setLoading(false);
+      return;
+    }
 
     setLoading(false);
     navigate('/(onboarding)/confirm-product');
@@ -79,6 +89,13 @@ export default function UserTypeScreen() {
             This helps us set up the right experience for you.
           </Text>
         </Animated.View>
+
+        {/* Error Alert */}
+        {error && (
+          <View style={styles.alertError}>
+            <Text style={styles.alertErrorText}>⚠️ {error}</Text>
+          </View>
+        )}
 
         {/* Radio Cards */}
         <Animated.View
@@ -231,6 +248,22 @@ const styles = StyleSheet.create({
     color: '#64748B',
     marginTop: Spacing.xs,
     lineHeight: 22,
+  },
+
+  /* Alert */
+  alertError: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: Radii.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  alertErrorText: {
+    fontSize: 13,
+    fontWeight: '500',
+    fontFamily: 'Inter',
+    color: '#DC2626',
   },
 
   /* Cards */

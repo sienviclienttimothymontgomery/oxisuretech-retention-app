@@ -2,11 +2,14 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
   Modal,
-  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigate } from 'react-router-dom';
@@ -28,17 +31,32 @@ export default function ConfirmProductScreen() {
   const [loading, setLoading] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [scannedProduct, setScannedProduct] = useState<{sku: string; name: string; pack: string} | null>(null);
+  const [orderId, setOrderId] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   const handleConfirm = async () => {
     if (!user) return;
+    if (!orderId.trim()) {
+      setError('Please enter your Store Order ID to continue.');
+      return;
+    }
+    
     setLoading(true);
+    setError(null);
 
     const skuToSave = scannedProduct?.sku || 'OXI-TUB-07';
 
-    await supabase
+    const { error: dbError } = await supabase
       .from('profiles')
-      .update({ product_sku: skuToSave })
+      .update({ product_sku: skuToSave, order_id: orderId.trim() })
       .eq('id', user.id);
+
+    if (dbError) {
+      console.error('[Product Registration] DB error:', dbError);
+      setError('Failed to save product info. Please try again.');
+      setLoading(false);
+      return;
+    }
 
     setLoading(false);
     navigate('/(onboarding)/quantity');
@@ -52,19 +70,24 @@ export default function ConfirmProductScreen() {
       setScannedProduct({ sku: '6H-NCN9-95CJ', name: 'OxiSure Oxygen Tubing', pack: '1 Pack' });
       setShowScanner(false);
     } else {
-      Alert.alert(
-        'Product Not Recognized',
-        `The scanned code (${data}) is not a supported OxiSure product. Please try again or contact support.`
-      );
+      setError(`The scanned code (${data}) is not a supported OxiSure product. Please try again or contact support.`);
     }
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView 
+      style={styles.container} 
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.bg }]} />
 
-      <View style={styles.content}>
-        {/* Step Indicator */}
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        {/* Back + Step Indicator */}
+        <View style={styles.navRow}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigate('/(onboarding)')} activeOpacity={0.7}>
+            <Text style={styles.backArrow}>←</Text>
+          </TouchableOpacity>
+        </View>
         <StepIndicator steps={STEPS} currentStep={1} />
 
         {/* Heading */}
@@ -76,6 +99,13 @@ export default function ConfirmProductScreen() {
               : 'We detected this product from your purchase. Is this correct?'}
           </Text>
         </View>
+
+        {/* Error Alert */}
+        {error && (
+          <View style={styles.alertError}>
+            <Text style={styles.alertErrorText}>⚠️ {error}</Text>
+          </View>
+        )}
 
         {/* Product Card */}
         <View
@@ -116,6 +146,22 @@ export default function ConfirmProductScreen() {
           </View>
         </View>
 
+        {/* Order ID Input */}
+        <View style={styles.orderIdContainer}>
+          <Text style={styles.orderIdLabel}>Store Order ID <Text style={{color: '#DC2626'}}>*</Text></Text>
+          <TextInput
+            style={styles.orderIdInput}
+            placeholder="e.g. OXI-123456"
+            value={orderId}
+            onChangeText={(text) => { setOrderId(text); setError(null); }}
+            placeholderTextColor="#94A3B8"
+            autoCapitalize="characters"
+          />
+          <Text style={styles.orderIdSub}>
+            Required to register your product and track your warranty.
+          </Text>
+        </View>
+
         {/* Info Box */}
         <View style={styles.infoBox}>
           <Text style={styles.infoText}>
@@ -129,9 +175,9 @@ export default function ConfirmProductScreen() {
         {/* CTAs */}
         <View style={styles.ctaContainer}>
           <TouchableOpacity
-            style={[styles.primaryButton, { opacity: loading ? 0.7 : 1 }]}
+            style={[styles.primaryButton, { opacity: (loading || !orderId.trim()) ? 0.6 : 1 }]}
             onPress={handleConfirm}
-            disabled={loading}
+            disabled={loading || !orderId.trim()}
             activeOpacity={0.85}
           >
             <LinearGradient
@@ -160,7 +206,7 @@ export default function ConfirmProductScreen() {
             </Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </ScrollView>
 
       {/* QR Scanner Modal */}
       <Modal
@@ -174,13 +220,18 @@ export default function ConfirmProductScreen() {
           onClose={() => setShowScanner(false)}
         />
       </Modal>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { flex: 1, paddingHorizontal: Spacing.lg, paddingTop: Spacing.xxl },
+
+  /* Nav */
+  navRow: { flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.sm },
+  backBtn: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFF', borderWidth: 1, borderColor: '#E2E8F0', ...Shadows.sm },
+  backArrow: { fontSize: 18, color: '#475569', fontWeight: '600' },
 
   /* Heading */
   heading: { marginBottom: Spacing.lg },
@@ -197,6 +248,22 @@ const styles = StyleSheet.create({
     color: '#64748B',
     marginTop: Spacing.xs,
     lineHeight: 22,
+  },
+
+  /* Alert */
+  alertError: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: Radii.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  alertErrorText: {
+    fontSize: 13,
+    fontWeight: '500',
+    fontFamily: 'Inter',
+    color: '#DC2626',
   },
 
   /* Product Card */
@@ -238,6 +305,36 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     ...Shadows.sm,
+  },
+
+  /* Order ID Input */
+  orderIdContainer: {
+    marginBottom: Spacing.lg,
+  },
+  orderIdLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    fontFamily: 'Inter',
+    color: '#1A1A2E',
+    marginBottom: Spacing.sm,
+  },
+  orderIdInput: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: Radii.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 14,
+    fontSize: 16,
+    fontFamily: 'Inter',
+    color: '#1A1A2E',
+    ...Shadows.sm,
+  },
+  orderIdSub: {
+    fontSize: 13,
+    fontFamily: 'Inter',
+    color: '#64748B',
+    marginTop: Spacing.xs,
   },
 
   /* Info Box */

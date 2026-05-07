@@ -36,6 +36,17 @@ export function useAuth() {
   return useContext(AuthContext);
 }
 
+// Derive the Supabase storage key from the project URL so we never hardcode a project ref.
+function getSupabaseStorageKey(): string {
+  try {
+    const url = import.meta.env.VITE_SUPABASE_URL || '';
+    const ref = new URL(url).hostname.split('.')[0];
+    return `sb-${ref}-auth-token`;
+  } catch {
+    return 'sb-auth-token-fallback';
+  }
+}
+
 function useProtectedRoute(user: User | null, loading: boolean, isAdmin: boolean, onboardingCompleted: boolean | null) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -81,6 +92,76 @@ function useProtectedRoute(user: User | null, loading: boolean, isAdmin: boolean
   }, [user, location.pathname, loading, isAdmin, onboardingCompleted, navigate]);
 }
 
+/**
+ * Check admin status from the database `profiles.is_admin` column
+ * instead of a hardcoded email list (security fix).
+ */
+async function checkAdminFromDB(userId: string): Promise<boolean> {
+  try {
+    const profilePromise = supabase
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', userId)
+      .single();
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Admin check timeout')), 3000)
+    );
+    const { data } = await Promise.race([profilePromise, timeoutPromise]) as any;
+    return data?.is_admin === true;
+  } catch {
+    // On timeout/error, fall back to local cache
+    try {
+      const cached = localStorage.getItem(`is_admin_${userId}`);
+      return cached === 'true';
+    } catch {
+      return false;
+    }
+  }
+}
+
+/**
+ * Centralized helper to resolve a user's profile state (admin status + onboarding).
+ * Eliminates the duplicated logic that was previously in 4 places.
+ */
+async function resolveProfileState(userId: string): Promise<{
+  isAdmin: boolean;
+  onboardingCompleted: boolean;
+}> {
+  let localCompletedStr = 'false';
+  try {
+    localCompletedStr = localStorage.getItem(`onboarding_completed_${userId}`) || 'false';
+  } catch {}
+
+  try {
+    const profilePromise = supabase
+      .from('profiles')
+      .select('onboarding_completed, is_admin')
+      .eq('id', userId)
+      .single();
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Profile fetch timeout')), 3000)
+    );
+    const { data: profile } = await Promise.race([profilePromise, timeoutPromise]) as any;
+
+    const admin = profile?.is_admin === true;
+    const completed = profile?.onboarding_completed || localCompletedStr === 'true';
+
+    // Cache admin status locally for fallback
+    try { localStorage.setItem(`is_admin_${userId}`, String(admin)); } catch {}
+
+    return { isAdmin: admin, onboardingCompleted: completed };
+  } catch {
+    console.warn('Profile fetch timed out or failed, relying on local state');
+    const cachedAdmin = (() => {
+      try { return localStorage.getItem(`is_admin_${userId}`) === 'true'; } catch { return false; }
+    })();
+    return {
+      isAdmin: cachedAdmin,
+      onboardingCompleted: localCompletedStr === 'true',
+    };
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -102,62 +183,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Track whether we've already processed an OAuth URL in this session
   const oauthProcessedRef = useRef(false);
 
-  // Admin emails - add more as needed
-  const ADMIN_EMAILS = ['admin@oxisuretech.com'];
-
-  const checkAdminStatus = (userEmail: string | undefined): boolean => {
-    if (!userEmail) return false;
-    return ADMIN_EMAILS.includes(userEmail.toLowerCase());
-  };
-
   const navigateAfterAuth = useCallback(async (newSession: Session | null) => {
     if (!newSession?.user) return;
     
     // Explicitly update React session state so the route guard doesn't kick us out!
     setSession(newSession);
     
-    const admin = checkAdminStatus(newSession.user.email);
+    const { isAdmin: admin, onboardingCompleted: completed } = await resolveProfileState(newSession.user.id);
     setIsAdmin(admin);
+    handleSetOnboardingCompleted(completed);
     
     if (admin) {
       navigate('/(app)/admin', { replace: true });
     } else {
-      let localCompletedStr = 'false';
-      try {
-        localCompletedStr = localStorage.getItem(`onboarding_completed_${newSession.user.id}`) || 'false';
-      } catch(e) {}
-      
-      try {
-        const profilePromise = supabase.from('profiles').select('onboarding_completed').eq('id', newSession.user.id).single();
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Profile fetch timeout')), 3000));
-        const { data: profile } = await Promise.race([profilePromise, timeoutPromise]) as any;
-        const hasCompleted = profile?.onboarding_completed || localCompletedStr === 'true';
-        handleSetOnboardingCompleted(hasCompleted);
-        navigate(hasCompleted ? '/(app)/dashboard' : '/(onboarding)/welcome', { replace: true });
-      } catch (e) {
-        console.warn('OAuth profile fetch timed out or failed, relying on local state');
-        const hasCompleted = localCompletedStr === 'true';
-        handleSetOnboardingCompleted(hasCompleted);
-        navigate(hasCompleted ? '/(app)/dashboard' : '/(onboarding)/welcome', { replace: true });
-      }
+      navigate(completed ? '/(app)/dashboard' : '/(onboarding)/welcome', { replace: true });
     }
-  }, [navigate]);
+  }, [navigate, handleSetOnboardingCompleted]);
 
   useEffect(() => {
+    let mounted = true;
     // Configure Google Sign-In (no-op for browser-based flow, kept for API consistency)
     configureGoogleSignIn();
 
     // Failsafe timeout: if Supabase hangs (e.g. stuck refresh token network request), 
     // manually rescue the session from localStorage so the user isn't forced to log in again.
+    const storageKey = getSupabaseStorageKey();
     const timeoutId = setTimeout(() => {
       console.warn('Supabase getSession timed out. Attempting manual session recovery.');
       try {
-        const tokenStr = localStorage.getItem('sb-ytqnbvkordtflrvibmss-auth-token');
+        const tokenStr = localStorage.getItem(storageKey);
         if (tokenStr) {
           const parsed = JSON.parse(tokenStr);
           if (parsed && parsed.user) {
             setSession({ user: parsed.user } as any);
-            setIsAdmin(checkAdminStatus(parsed.user.email));
+            
+            // Check admin from local cache (DB check already timed out)
+            const cachedAdmin = (() => {
+              try { return localStorage.getItem(`is_admin_${parsed.user.id}`) === 'true'; } catch { return false; }
+            })();
+            setIsAdmin(cachedAdmin);
             
             const localCompletedStr = localStorage.getItem(`onboarding_completed_${parsed.user.id}`);
             setOnboardingCompleted(localCompletedStr === 'true');
@@ -185,21 +249,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       setSession(session);
       if (session?.user) {
-        setIsAdmin(checkAdminStatus(session.user.email));
-        let localCompletedStr = 'false';
-        try {
-          localCompletedStr = localStorage.getItem(`onboarding_completed_${session.user.id}`) || 'false';
-        } catch(e) {}
-        
-        try {
-          const profilePromise = supabase.from('profiles').select('onboarding_completed').eq('id', session.user.id).single();
-          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Profile fetch timeout')), 3000));
-          const { data: profile } = await Promise.race([profilePromise, timeoutPromise]) as any;
-          const hasCompleted = profile?.onboarding_completed || localCompletedStr === 'true';
-          if (mounted) setOnboardingCompleted(hasCompleted);
-        } catch (e) {
-          console.warn('Profile fetch timed out or failed, relying on local state');
-          if (mounted) setOnboardingCompleted(localCompletedStr === 'true');
+        const { isAdmin: admin, onboardingCompleted: completed } = await resolveProfileState(session.user.id);
+        if (mounted) {
+          setIsAdmin(admin);
+          setOnboardingCompleted(completed);
         }
       } else {
         setIsAdmin(false);
@@ -328,44 +381,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return;
           }
 
-          // PKCE exchange failed — likely code_verifier was lost.
-          // Fallback: call the Supabase token endpoint directly.
+          // PKCE exchange failed — log the error but do NOT attempt
+          // an empty code_verifier bypass (security anti-pattern).
           console.warn('[AuthProvider] PKCE exchange failed:', error?.message);
-          console.log('[AuthProvider] Trying direct token endpoint fallback...');
-
-          try {
-            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-            const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-            const resp = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=pkce`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'apikey': supabaseKey,
-              },
-              body: JSON.stringify({
-                auth_code: code,
-                code_verifier: '', // empty — server may accept if PKCE is not strictly enforced
-              }),
-            });
-
-            if (resp.ok) {
-              const tokenData = await resp.json();
-              if (tokenData.access_token) {
-                console.log('[AuthProvider] Direct token fetch succeeded!');
-                const { data: sessionData, error: sessErr } = await supabase.auth.setSession({
-                  access_token: tokenData.access_token,
-                  refresh_token: tokenData.refresh_token || '',
-                });
-                if (!sessErr && sessionData.session) {
-                  navigateAfterAuth(sessionData.session);
-                  return;
-                }
-              }
-            }
-            console.warn('[AuthProvider] Direct token fallback also failed. Status:', resp.status);
-          } catch (fetchErr) {
-            console.error('[AuthProvider] Direct token fetch error:', fetchErr);
-          }
+          console.warn('[AuthProvider] The code_verifier may have been lost. User may need to retry login.');
 
           // Last resort — check if session somehow exists
           const { data: lastResort } = await supabase.auth.getSession();
@@ -422,7 +441,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.log('[AuthProvider] Session found after browser close (fallback)!');
             oauthProcessedRef.current = true;
             setSession(data.session);
-            setIsAdmin(checkAdminStatus(data.session.user.email));
+            const adminStatus = await checkAdminFromDB(data.session.user.id);
+            setIsAdmin(adminStatus);
             navigateAfterAuth(data.session);
           } else {
             console.log('[AuthProvider] No session after browser close. User may have cancelled.');
@@ -448,22 +468,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // in case onAuthStateChange listener drops the event on WebViews
     if (!error && data?.session) {
       setSession(data.session);
-      setIsAdmin(checkAdminStatus(data.session.user.email));
       
-      let localCompletedStr = 'false';
-      try {
-        localCompletedStr = localStorage.getItem(`onboarding_completed_${data.session.user.id}`) || 'false';
-      } catch(e) {}
-      
-      try {
-        const profilePromise = supabase.from('profiles').select('onboarding_completed').eq('id', data.session.user.id).single();
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Profile fetch timeout')), 3000));
-        const { data: profile } = await Promise.race([profilePromise, timeoutPromise]) as any;
-        const hasCompleted = profile?.onboarding_completed || localCompletedStr === 'true';
-        setOnboardingCompleted(hasCompleted);
-      } catch (e) {
-        setOnboardingCompleted(localCompletedStr === 'true');
-      }
+      const { isAdmin: admin, onboardingCompleted: completed } = await resolveProfileState(data.session.user.id);
+      setIsAdmin(admin);
+      setOnboardingCompleted(completed);
     }
     
     return { error: error as Error | null };
@@ -483,7 +491,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     if (!error && data?.session) {
       setSession(data.session);
-      setIsAdmin(checkAdminStatus(data.session.user.email));
+      setIsAdmin(false); // New signups are never admin
       setOnboardingCompleted(false); // New signups always need onboarding
     }
     

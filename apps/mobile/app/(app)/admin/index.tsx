@@ -21,6 +21,7 @@ export default function AdminDashboardScreen() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const headerOp = useRef(new Animated.Value(0)).current;
   const statsOp = useRef(new Animated.Value(0)).current;
   const statsY = useRef(new Animated.Value(20)).current;
@@ -28,7 +29,24 @@ export default function AdminDashboardScreen() {
   const listY = useRef(new Animated.Value(30)).current;
 
   const fetchUsers = async () => {
-    const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
+    setFetchError(null);
+    const { data, error, count } = await supabase
+      .from('profiles')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false });
+
+    console.log('[ADMIN] Fetch profiles result:', {
+      rowCount: data?.length ?? 0,
+      exactCount: count,
+      error: error?.message ?? 'none',
+      userTypes: data?.map(u => u.user_type),
+      adminFlags: data?.map(u => u.is_admin),
+    });
+
+    if (error) {
+      console.error('[ADMIN] Supabase error:', error);
+      setFetchError(error.message);
+    }
     if (data) setUsers(data as UserProfile[]);
   };
 
@@ -78,6 +96,21 @@ export default function AdminDashboardScreen() {
               <Text style={s.signOutText}>Sign Out</Text>
             </TouchableOpacity>
           </Animated.View>
+
+          {fetchError && (
+            <View style={{ backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', borderRadius: 12, padding: 14, marginBottom: 12 }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#DC2626', fontFamily: 'Inter' }}>⚠️ Database Error</Text>
+              <Text style={{ fontSize: 12, color: '#991B1B', fontFamily: 'Inter', marginTop: 4 }}>{fetchError}</Text>
+            </View>
+          )}
+          {!fetchError && users.length <= 1 && (
+            <View style={{ backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A', borderRadius: 12, padding: 14, marginBottom: 12 }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#D97706', fontFamily: 'Inter' }}>⚠️ Only {users.length} profile(s) returned</Text>
+              <Text style={{ fontSize: 12, color: '#92400E', fontFamily: 'Inter', marginTop: 4 }}>
+                This usually means the admin RLS migration hasn't been applied yet. Please run the SQL from the admin migration in your Supabase SQL Editor.
+              </Text>
+            </View>
+          )}
 
           <Animated.View style={[s.statsGrid, { opacity: statsOp, transform: [{ translateY: statsY }] }]}>
             {stats.map(st => (
