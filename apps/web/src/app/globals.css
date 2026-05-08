@@ -245,9 +245,30 @@ p {
   flex-direction: column;
 }
 
+/* Web dashboard container — wider for desktop */
+.web-page-container {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 24px 20px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
 @media (min-width: 640px) {
   .page-container {
     padding: 32px 24px;
+  }
+  .web-page-container {
+    max-width: 720px;
+    padding: 40px 32px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .web-page-container {
+    max-width: 800px;
+    padding: 48px 40px;
   }
 }
 

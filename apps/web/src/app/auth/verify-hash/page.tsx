@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { Loader2 } from "lucide-react";
@@ -11,37 +11,97 @@ function VerifyHashContent() {
   const searchParams = useSearchParams();
   const supabase = createClient();
   const [status, setStatus] = useState("Verifying your secure link...");
+  const processed = useRef(false);
 
   useEffect(() => {
+    if (processed.current) return;
+    processed.current = true;
+
     let isMounted = true;
 
     const processAuth = async () => {
       try {
-        // The @supabase/ssr createBrowserClient automatically parses the #access_token
-        // from the URL hash, establishes the session, and sets the browser cookies.
-        // We just need to check if the session exists.
-        
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        if (error) throw error;
+        const hash = window.location.hash;
+        const hashParams = new URLSearchParams(hash.substring(1));
 
+        // Check for errors in the hash fragment
+        if (hashParams.has("error_description")) {
+          const desc = hashParams.get("error_description") || "Unknown error";
+          console.error("Auth hash error:", desc);
+          if (isMounted) router.push('/auth/auth-code-error');
+          return;
+        }
+
+        const accessToken = hashParams.get("access_token");
+        const refreshToken = hashParams.get("refresh_token");
+
+        // If the URL hash contains tokens, sign out any existing session first,
+        // then set the new session from the magic link tokens.
+        if (accessToken && refreshToken) {
+          if (isMounted) setStatus("Signing you in...");
+
+          // Sign out existing session silently (don't redirect)
+          await supabase.auth.signOut({ scope: 'local' });
+
+          // Set the session from the magic link tokens
+          const { data, error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+
+          if (error) {
+            console.error("setSession error:", error.message);
+            if (isMounted) router.push('/auth/auth-code-error');
+            return;
+          }
+
+          if (data.session) {
+            if (isMounted) setStatus("Verification successful! Redirecting...");
+            const next = searchParams.get('next') || '/web/dashboard';
+            setTimeout(() => {
+              if (isMounted) router.push(next);
+            }, 500);
+            return;
+          }
+        }
+
+        // No tokens in hash — maybe we landed here from a callback redirect.
+        // Check for an existing valid session.
+        const { data: { session } } = await supabase.auth.getSession();
         if (session) {
-          if (isMounted) setStatus("Verification successful! Redirecting...");
-          // Grab the intended destination
+          if (isMounted) setStatus("Already signed in. Redirecting...");
           const next = searchParams.get('next') || '/web/dashboard';
-          // Small delay to ensure cookies are fully committed
           setTimeout(() => {
             if (isMounted) router.push(next);
           }, 500);
-        } else {
-          // If no session is found, check if there's an error in the hash
-          const hashParams = new URLSearchParams(window.location.hash.substring(1));
-          if (hashParams.has("error_description")) {
-            if (isMounted) router.push('/auth/auth-code-error');
-          } else {
-            // It might take a split second for the listener to fire
-          }
+          return;
         }
+
+        // No tokens, no session — wait for auth listener up to 10 seconds
+        const timeout = setTimeout(() => {
+          if (isMounted) {
+            setStatus("Link expired or invalid. Redirecting...");
+            setTimeout(() => {
+              if (isMounted) router.push('/auth/auth-code-error');
+            }, 1500);
+          }
+        }, 10000);
+
+        const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+          if (event === 'SIGNED_IN' && session) {
+            clearTimeout(timeout);
+            if (isMounted) setStatus("Verification successful! Redirecting...");
+            const next = searchParams.get('next') || '/web/dashboard';
+            router.push(next);
+          }
+        });
+
+        // Cleanup listener on unmount
+        return () => {
+          clearTimeout(timeout);
+          authListener.subscription.unsubscribe();
+        };
+
       } catch (err) {
         console.error("Hash verification error:", err);
         if (isMounted) router.push('/auth/auth-code-error');
@@ -50,18 +110,8 @@ function VerifyHashContent() {
 
     processAuth();
 
-    // Fallback listener in case getSession fires before the hash is fully parsed
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' && session) {
-        if (isMounted) setStatus("Verification successful! Redirecting...");
-        const next = searchParams.get('next') || '/web/dashboard';
-        router.push(next);
-      }
-    });
-
     return () => {
       isMounted = false;
-      authListener.subscription.unsubscribe();
     };
   }, [router, searchParams, supabase.auth]);
 

@@ -52,6 +52,7 @@ export async function updateSession(request: NextRequest) {
                           request.nextUrl.pathname.startsWith('/app/quantity')
   
   const isWebDashboard = request.nextUrl.pathname.startsWith('/web/dashboard')
+  const isWebAdmin = request.nextUrl.pathname.startsWith('/web/admin')
   const isWebOnboarding = request.nextUrl.pathname.startsWith('/web/onboarding')
   const isWebStart = request.nextUrl.pathname === '/web/start'
   const isWebEmail = request.nextUrl.pathname === '/web/check-email'
@@ -66,7 +67,7 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  if (!user && (isWebDashboard || isWebOnboarding)) {
+  if (!user && (isWebDashboard || isWebAdmin || isWebOnboarding)) {
     // protect web routes
     const url = request.nextUrl.clone()
     url.pathname = '/web/start'
@@ -79,16 +80,31 @@ export async function updateSession(request: NextRequest) {
                          isWebStart || 
                          isWebEmail
 
-  // Root redirection for authenticated users trying to access starter pages
-  if (user && isStarterRoute) {
+  // Admin routing: admins should only see /web/admin, not the regular dashboard
+  if (user && (isStarterRoute || isWebDashboard || isWebOnboarding)) {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('path_type')
+      .select('is_admin')
       .eq('id', user.id)
       .single()
-    
+
+    if (profile?.is_admin) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/web/admin'
+      return NextResponse.redirect(url)
+    }
+  }
+
+  // Root redirection for authenticated (non-admin) users trying to access starter pages
+  if (user && isStarterRoute) {
     const url = request.nextUrl.clone()
-    url.pathname = profile?.path_type === 'web' ? '/web/dashboard' : '/app/dashboard'
+    // Route based on which starter page they're on, not profile path_type
+    // This allows mobile-registered users to also access the web dashboard
+    if (isWebStart || isWebEmail) {
+      url.pathname = '/web/dashboard'
+    } else {
+      url.pathname = '/app/dashboard'
+    }
     return NextResponse.redirect(url)
   }
 
