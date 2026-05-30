@@ -83,8 +83,17 @@ export default function LoginForm({ type, redirectTo }: { type: 'app' | 'web'; r
         if (error) {
           setError(error.message)
         } else {
-          window.location.href = destination
-          return
+          // Verify the session is properly established before navigating
+          // This ensures cookies are set before the server-side middleware reads them
+          const { data: { session } } = await supabase.auth.getSession()
+          if (session) {
+            // Small delay to ensure cookies are flushed to the browser cookie jar
+            await new Promise(resolve => setTimeout(resolve, 100))
+            window.location.href = destination
+            return
+          } else {
+            setError('Sign in succeeded but session could not be established. Please try again.')
+          }
         }
       } catch (err: any) {
         console.error('Password signin error:', err)
