@@ -11,6 +11,7 @@ export async function createClient() {
       cookieOptions: {
         name: '__session',
       },
+      cookieEncoding: 'raw',
       cookies: {
         getAll() {
           return cookieStore.getAll()

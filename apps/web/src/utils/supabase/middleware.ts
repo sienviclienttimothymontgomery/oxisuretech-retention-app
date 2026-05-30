@@ -20,6 +20,7 @@ export async function updateSession(request: NextRequest) {
       cookieOptions: {
         name: '__session',
       },
+      cookieEncoding: 'raw',
       cookies: {
         getAll() {
           return request.cookies.getAll()

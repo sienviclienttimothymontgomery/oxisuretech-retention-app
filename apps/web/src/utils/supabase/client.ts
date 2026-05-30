@@ -8,6 +8,8 @@ export function createClient() {
       cookieOptions: {
         name: '__session',
       },
+      cookieEncoding: 'raw',
+      isSingleton: false,
     }
   )
 }
