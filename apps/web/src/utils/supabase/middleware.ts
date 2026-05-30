@@ -98,6 +98,7 @@ export async function updateSession(request: NextRequest) {
   if (user && !isPrefetch && (isStarterRoute || isWebDashboard || isWebOnboarding)) {
     const isAdminEmail = user.email === 'admin@oxisuretech.com'
     if (isAdminEmail) {
+      console.log(`[Middleware] 👑 Admin user detected, redirecting from ${path} to /web/admin`)
       const url = request.nextUrl.clone()
       url.pathname = '/web/admin'
       return NextResponse.redirect(url)
@@ -110,8 +111,10 @@ export async function updateSession(request: NextRequest) {
     // Route based on which starter page they're on, not profile path_type
     // This allows mobile-registered users to also access the web dashboard
     if (isWebStart || isWebEmail) {
+      console.log(`[Middleware] 🔄 Authenticated user on ${path}, redirecting to /web/dashboard`)
       url.pathname = '/web/dashboard'
     } else {
+      console.log(`[Middleware] 🔄 Authenticated user on ${path}, redirecting to /app/dashboard`)
       url.pathname = '/app/dashboard'
     }
     return NextResponse.redirect(url)

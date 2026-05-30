@@ -52,17 +52,36 @@ export default async function WebDashboard({ searchParams }: { searchParams: Pro
   }
 
   console.log(`[Dashboard] 📦 Fetching user profile from db for UUID: ${user.id}...`)
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles').select('*').eq('id', user.id).single()
-  console.log('[Dashboard] 📄 Profile fetch finished. Profile found:', !!profile)
+  console.log('[Dashboard] 📄 Profile fetch result:', {
+    found: !!profile,
+    error: profileError?.message || null,
+    onboarding_completed: profile?.onboarding_completed,
+    order_verified: profile?.order_verified,
+    path_type: profile?.path_type,
+  })
+
+  // If no profile exists at all (e.g. database trigger didn't fire),
+  // create one and send to onboarding instead of the order verification page
+  if (!profile) {
+    console.log('[Dashboard] ⚠️ No profile row found — creating one and redirecting to /web/onboarding')
+    await supabase.from('profiles').upsert({
+      id: user.id,
+      email: user.email,
+      auth_provider: user.app_metadata?.provider || 'email',
+      path_type: 'web',
+    })
+    return redirect('/web/onboarding')
+  }
 
   const isAdmin = profile?.is_admin === true;
 
-  if (!profile?.onboarding_completed && !profile?.order_verified) {
-    console.log('[Dashboard] 🚨 Profile incomplete, redirecting to /activate')
+  if (!profile.onboarding_completed && !profile.order_verified) {
+    console.log('[Dashboard] 🚨 Profile incomplete (onboarding_completed=false, order_verified=false), redirecting to /activate')
     return redirect('/activate')
   }
-  if (!profile?.onboarding_completed) {
+  if (!profile.onboarding_completed) {
     console.log('[Dashboard] 📋 Onboarding incomplete, redirecting to /web/onboarding')
     return redirect('/web/onboarding')
   }

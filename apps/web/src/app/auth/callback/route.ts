@@ -13,7 +13,8 @@ export async function GET(request: Request) {
     if (!error) {
       // Use standard Next.js URL resolution to safely redirect on the current domain
       // This prevents bugs where x-forwarded-host sends users to the wrong domain
-      return NextResponse.redirect(new URL(next, request.url))
+      const redirectUrl = new URL(next, request.url)
+      return NextResponse.redirect(redirectUrl)
     }
   }
 

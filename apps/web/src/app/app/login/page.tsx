@@ -12,7 +12,7 @@ export default function AppLogin() {
         <h1 className="text-2xl font-semibold mb-2">Welcome Back</h1>
         <p className="text-[var(--color-text-muted)]">Sign in to your OxiSure account.</p>
       </div>
-      <LoginForm type="app" redirectTo="/app/user-type" />
+      <LoginForm type="app" redirectTo="/app/dashboard" />
       <Link
         href="/"
         className="block text-center text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors py-1 mt-4"
