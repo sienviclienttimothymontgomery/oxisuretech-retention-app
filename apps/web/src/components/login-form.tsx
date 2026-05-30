@@ -76,24 +76,21 @@ export default function LoginForm({ type, redirectTo }: { type: 'app' | 'web'; r
     } else {
       // Password login (works for both app and web)
       try {
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         })
         if (error) {
           setError(error.message)
+        } else if (data?.session) {
+          // Session is confirmed from the sign-in response itself — no need for a separate getSession() call
+          // which can be unreliable with @supabase/ssr due to cookie timing issues.
+          // Small delay to ensure cookies are flushed to the browser cookie jar
+          await new Promise(resolve => setTimeout(resolve, 150))
+          window.location.href = destination
+          return
         } else {
-          // Verify the session is properly established before navigating
-          // This ensures cookies are set before the server-side middleware reads them
-          const { data: { session } } = await supabase.auth.getSession()
-          if (session) {
-            // Small delay to ensure cookies are flushed to the browser cookie jar
-            await new Promise(resolve => setTimeout(resolve, 100))
-            window.location.href = destination
-            return
-          } else {
-            setError('Sign in succeeded but session could not be established. Please try again.')
-          }
+          setError('Sign in succeeded but session could not be established. Please try again.')
         }
       } catch (err: any) {
         console.error('Password signin error:', err)
