@@ -1,10 +1,8 @@
 import React from 'react';
-import { AppRegistry } from 'react-native';
+import ReactDOM from 'react-dom/client';
 import AppRouter from './AppRouter';
 
-AppRegistry.registerComponent('App', () => AppRouter);
-
-AppRegistry.runApplication('App', {
-  initialProps: {},
-  rootTag: document.getElementById('root')
-});
+// react-native-web 0.21 uses the legacy ReactDOM.render() API which was removed
+// in React 19. We bypass AppRegistry entirely and mount with createRoot instead.
+const root = ReactDOM.createRoot(document.getElementById('root')!);
+root.render(<AppRouter />);

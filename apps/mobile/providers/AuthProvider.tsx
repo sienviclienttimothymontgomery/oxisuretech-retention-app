@@ -5,6 +5,7 @@ import { configureGoogleSignIn, signInWithGoogle as googleSignIn } from '@/lib/g
 import { useNavigate, useLocation } from 'react-router-dom';
 import { App } from '@capacitor/app';
 import { Browser } from '@capacitor/browser';
+import { Capacitor } from '@capacitor/core';
 
 type AuthContextType = {
   session: Session | null;
@@ -12,7 +13,7 @@ type AuthContextType = {
   loading: boolean;
   isAdmin: boolean;
   signInWithEmail: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUpWithEmail: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signUpWithEmail: (email: string, password: string, fullName?: string) => Promise<{ error: Error | null }>;
   signInWithGoogle: () => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   onboardingCompleted: boolean | null;
@@ -410,6 +411,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
+    // Only register deep-link listeners on native platforms (Capacitor).
+    // In the browser (Vite dev), these APIs hang forever and block rendering.
+    if (!Capacitor.isNativePlatform()) return;
+
     // 1. Check if the app was LAUNCHED by a deep link (cold start)
     App.getLaunchUrl().then((result) => {
       if (result?.url) {
@@ -477,7 +482,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: error as Error | null };
   };
 
-  const signUpWithEmail = async (email: string, password: string) => {
+  const signUpWithEmail = async (email: string, password: string, fullName?: string) => {
     const emailRedirectTo = 'com.anonymous.oxisuretechmobile://login-callback';
     console.log('[Auth] Email redirect URI:', emailRedirectTo);
 
@@ -486,6 +491,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       password,
       options: {
         emailRedirectTo,
+        data: fullName ? { full_name: fullName } : undefined,
       },
     });
     

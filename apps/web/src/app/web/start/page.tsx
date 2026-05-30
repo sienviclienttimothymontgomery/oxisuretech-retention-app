@@ -1,5 +1,4 @@
 import LoginForm from '@/components/login-form'
-import Image from 'next/image'
 import Link from 'next/link'
 import { Clock, Bell, PackageCheck, Shield } from 'lucide-react'
 
@@ -55,13 +54,15 @@ export default function WebStart() {
         <div className="w-full max-w-[420px]">
           {/* Mobile-only logo */}
           <div className="flex justify-center mb-8 lg:hidden">
-            <Image src="/logo.png" alt="OxiSure Tech" width={200} height={60} className="h-14 w-auto" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="OxiSure Tech" className="h-14 w-auto" />
           </div>
 
           {/* Header */}
           <div className="mb-8">
             <div className="flex items-center gap-2.5 mb-3">
-              <Image src="/logo.png" alt="OxiSureTech" width={140} height={42} className="h-9 w-auto" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo.png" alt="OxiSureTech" className="h-9 w-auto" />
               <span className="text-xs font-bold text-[#0EA5E9] uppercase tracking-[0.15em]">OxiSureTech</span>
             </div>
             <h2 className="text-2xl lg:text-3xl font-bold text-[#0F172A] mb-2">Welcome back</h2>

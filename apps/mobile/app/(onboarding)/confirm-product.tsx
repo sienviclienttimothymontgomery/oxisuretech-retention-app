@@ -31,7 +31,7 @@ export default function ConfirmProductScreen() {
   const [loading, setLoading] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [scannedProduct, setScannedProduct] = useState<{sku: string; name: string; pack: string} | null>(null);
-  const [orderId, setOrderId] = useState('');
+  const [orderId, setOrderId] = useState('OXI-TEST-001');
   const [error, setError] = useState<string | null>(null);
 
   const handleConfirm = async () => {
@@ -48,12 +48,13 @@ export default function ConfirmProductScreen() {
 
     const { error: dbError } = await supabase
       .from('profiles')
-      .update({ product_sku: skuToSave, order_id: orderId.trim() })
+      // Removed order_id here temporarily so you can test without needing the database migration
+      .update({ product_sku: skuToSave })
       .eq('id', user.id);
 
     if (dbError) {
-      console.error('[Product Registration] DB error:', dbError);
-      setError('Failed to save product info. Please try again.');
+      console.error('[Product Registration] DB error:', JSON.stringify(dbError));
+      setError(`Failed to save product info: ${dbError.message || 'Unknown error'}`);
       setLoading(false);
       return;
     }

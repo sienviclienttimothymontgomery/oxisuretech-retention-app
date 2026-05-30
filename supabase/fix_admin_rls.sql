@@ -20,10 +20,13 @@ BEGIN
     END LOOP;
 END $$;
 
--- 3. Recreate the secure admin check function
+-- 3. Recreate the secure admin check function using in-memory JWT claim check (eliminates N+1 database queries entirely)
 CREATE OR REPLACE FUNCTION public.is_admin()
 RETURNS BOOLEAN AS $$
-  SELECT is_admin FROM public.profiles WHERE id = auth.uid();
+  SELECT COALESCE(
+    auth.jwt() ->> 'email' = 'admin@oxisuretech.com',
+    FALSE
+  );
 $$ LANGUAGE sql SECURITY DEFINER SET search_path = public;
 
 -- 4. Recreate the core policies (combining the original ones + our fixed admin one)

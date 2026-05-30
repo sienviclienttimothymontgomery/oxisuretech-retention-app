@@ -40,6 +40,8 @@ export default function LoginScreen() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
+  const [fullName, setFullName] = useState('');
+  const [fullNameFocused, setFullNameFocused] = useState(false);
 
   // Animations
   const logoScale = useRef(new Animated.Value(0)).current;
@@ -114,8 +116,16 @@ export default function LoginScreen() {
   }, []);
 
   const handleSubmit = async () => {
+    if (isSignUp && !fullName.trim()) {
+      setError('Please enter your full name.');
+      return;
+    }
     if (!email || !password) {
       setError('Please fill in all fields.');
+      return;
+    }
+    if (isSignUp && password.length < 6) {
+      setError('Please enter a password (at least 6 characters).');
       return;
     }
     setLoading(true);
@@ -128,7 +138,7 @@ export default function LoginScreen() {
     ]).start();
 
     const { error: authError } = isSignUp
-      ? await signUpWithEmail(email, password)
+      ? await signUpWithEmail(email, password, fullName.trim())
       : await signInWithEmail(email, password);
 
     if (authError) {
@@ -257,6 +267,7 @@ export default function LoginScreen() {
                 transform: [{ translateY: cardTranslate }],
                 opacity: cardOpacity,
               },
+              isSignUp && { borderTopWidth: 4, borderTopColor: '#0EA5E9' }
             ]}
           >
             {/* Status Messages */}
@@ -270,6 +281,37 @@ export default function LoginScreen() {
               <View style={[styles.alert, styles.alertSuccess]}>
                 <Text style={styles.alertIcon}>✅</Text>
                 <Text style={styles.alertTextSuccess}>{message}</Text>
+              </View>
+            )}
+
+            {/* Full Name Input */}
+            {isSignUp && (
+              <View style={styles.inputWrapper}>
+                <Text style={styles.inputLabel}>Full Name</Text>
+                <View
+                  style={[
+                    styles.inputContainer,
+                    {
+                      borderColor: fullNameFocused ? colors.accent : colors.border,
+                      ...(fullNameFocused ? Shadows.glow(colors.accent + '40') : {}),
+                    },
+                  ]}
+                >
+                  <View style={[styles.inputIconCircle, { backgroundColor: fullNameFocused ? '#EFF6FF' : '#F8FAFC' }]}>
+                    <UserIcon color={fullNameFocused ? colors.accent : colors.textMuted} />
+                  </View>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. John Doe"
+                    placeholderTextColor={colors.textMuted}
+                    value={fullName}
+                    onChangeText={setFullName}
+                    autoCapitalize="words"
+                    autoCorrect={false}
+                    onFocus={() => setFullNameFocused(true)}
+                    onBlur={() => setFullNameFocused(false)}
+                  />
+                </View>
               </View>
             )}
 
@@ -391,53 +433,57 @@ export default function LoginScreen() {
             </TouchableOpacity>
 
             {/* Divider */}
-            <View style={styles.dividerRow}>
-              <LinearGradient
-                colors={['transparent', '#CBD5E1', 'transparent']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.dividerGradient}
-              />
-              <Text style={styles.dividerText}>or continue with</Text>
-              <LinearGradient
-                colors={['transparent', '#CBD5E1', 'transparent']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.dividerGradient}
-              />
-            </View>
+            {!isSignUp && (
+              <View style={styles.dividerRow}>
+                <LinearGradient
+                  colors={['transparent', '#CBD5E1', 'transparent']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.dividerGradient}
+                />
+                <Text style={styles.dividerText}>or continue with</Text>
+                <LinearGradient
+                  colors={['transparent', '#CBD5E1', 'transparent']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.dividerGradient}
+                />
+              </View>
+            )}
 
             {/* OAuth Buttons */}
-            <View style={styles.oauthRow}>
-              <TouchableOpacity
-                style={styles.oauthButton}
-                activeOpacity={0.75}
-                onPress={handleGoogleSignIn}
-                disabled={loading || googleLoading}
-              >
-                {googleLoading ? (
-                  <ActivityIndicator size="small" color={colors.text} />
-                ) : (
-                  <View style={styles.oauthButtonContent}>
-                    <View style={styles.oauthIconCircle}>
-                      <GoogleIcon size={18} />
+            {!isSignUp && (
+              <View style={styles.oauthRow}>
+                <TouchableOpacity
+                  style={styles.oauthButton}
+                  activeOpacity={0.75}
+                  onPress={handleGoogleSignIn}
+                  disabled={loading || googleLoading}
+                >
+                  {googleLoading ? (
+                    <ActivityIndicator size="small" color={colors.text} />
+                  ) : (
+                    <View style={styles.oauthButtonContent}>
+                      <View style={styles.oauthIconCircle}>
+                        <GoogleIcon size={18} />
+                      </View>
+                      <Text style={styles.oauthButtonText}>Google</Text>
                     </View>
-                    <Text style={styles.oauthButtonText}>Google</Text>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.oauthButton}
+                  activeOpacity={0.75}
+                >
+                  <View style={styles.oauthButtonContent}>
+                    <View style={[styles.oauthIconCircle, { backgroundColor: '#1A1A2E' }]}>
+                      <AppleIcon size={16} color="#FFFFFF" />
+                    </View>
+                    <Text style={styles.oauthButtonText}>Apple</Text>
                   </View>
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.oauthButton}
-                activeOpacity={0.75}
-              >
-                <View style={styles.oauthButtonContent}>
-                  <View style={[styles.oauthIconCircle, { backgroundColor: '#1A1A2E' }]}>
-                    <AppleIcon size={16} color="#FFFFFF" />
-                  </View>
-                  <Text style={styles.oauthButtonText}>Apple</Text>
-                </View>
-              </TouchableOpacity>
-            </View>
+                </TouchableOpacity>
+              </View>
+            )}
           </Animated.View>
 
           {/* Footer */}
@@ -490,6 +536,29 @@ function MailIcon({ color = "rgba(255,255,255,0.5)" }: { color?: string }) {
     <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
       <Rect x="2" y="4" width="20" height="16" rx="3" stroke={color} strokeWidth="1.5" />
       <Path d="M2 7l10 6 10-6" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function UserIcon({ color = "rgba(255,255,255,0.5)" }: { color?: string }) {
+  return (
+    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <SvgCircle
+        cx="12"
+        cy="7"
+        r="4"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </Svg>
   );
 }

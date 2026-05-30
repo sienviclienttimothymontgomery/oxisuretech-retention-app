@@ -59,7 +59,7 @@ function VerifyHashContent() {
             if (isMounted) setStatus("Verification successful! Redirecting...");
             const next = searchParams.get('next') || '/web/dashboard';
             setTimeout(() => {
-              if (isMounted) router.push(next);
+              if (isMounted) window.location.href = next;
             }, 500);
             return;
           }
@@ -72,7 +72,7 @@ function VerifyHashContent() {
           if (isMounted) setStatus("Already signed in. Redirecting...");
           const next = searchParams.get('next') || '/web/dashboard';
           setTimeout(() => {
-            if (isMounted) router.push(next);
+            if (isMounted) window.location.href = next;
           }, 500);
           return;
         }
@@ -92,7 +92,7 @@ function VerifyHashContent() {
             clearTimeout(timeout);
             if (isMounted) setStatus("Verification successful! Redirecting...");
             const next = searchParams.get('next') || '/web/dashboard';
-            router.push(next);
+            window.location.href = next;
           }
         });
 

@@ -1,6 +1,11 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 
+/**
+ * App dashboard — redirects users to the appropriate full dashboard.
+ * The /app/* flow is used for mobile onboarding; once complete, users
+ * should see the full-featured /web/dashboard.
+ */
 export default async function AppDashboard() {
   const supabase = await createClient()
   
@@ -12,31 +17,11 @@ export default async function AppDashboard() {
     .select('*')
     .eq('id', user.id)
     .single()
-  
-  if (profile?.path_type === 'web') {
-    return redirect('/web/dashboard')
-  }
 
   if (!profile?.onboarding_completed) {
     return redirect('/app/user-type')
   }
-    
-  return (
-    <div className="flex flex-col min-h-screen bg-[var(--color-bg)]">
-      <main className="flex-1 p-6">
-        <h1 className="text-2xl font-bold mb-4">Welcome to your App Dashboard</h1>
-        <div className="bg-white p-4 rounded-xl shadow border border-[var(--color-border)]">
-          <h2 className="text-lg font-semibold border-b pb-2 mb-2">Your Persisted Profile</h2>
-          <ul className="text-sm space-y-2 text-[var(--color-text-secondary)]">
-            <li><strong>Email:</strong> {user.email}</li>
-            <li><strong>Path:</strong> {profile?.path_type}</li>
-            <li><strong>Type:</strong> {profile?.user_type}</li>
-            <li><strong>Product SKU:</strong> {profile?.product_sku || 'None'}</li>
-            <li><strong>Quantity:</strong> {profile?.quantity || 1}</li>
-            <li><strong>Onboarding Completed:</strong> {profile?.onboarding_completed ? 'Yes' : 'No'}</li>
-          </ul>
-        </div>
-      </main>
-    </div>
-  )
+
+  // All users go to the unified web dashboard
+  return redirect('/web/dashboard')
 }

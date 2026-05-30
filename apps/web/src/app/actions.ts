@@ -47,22 +47,33 @@ export async function submitQuantity(formData: FormData) {
   redirect('/app/notifications')
 }
 
-export async function submitNotifications(pushEnabled: boolean, emailEnabled: boolean) {
+export async function submitNotifications(pushEnabled: boolean, emailEnabled: boolean, isOnboarding: boolean = true) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return
 
+  const updatePayload: Record<string, any> = {
+    notifications_push: pushEnabled,
+    notifications_email: emailEnabled,
+  };
+
+  if (isOnboarding) {
+    updatePayload.onboarding_completed = true;
+    updatePayload.tracker_started_at = new Date().toISOString();
+  }
+
   await supabase
     .from('profiles')
-    .update({ 
-      notifications_push: pushEnabled, 
-      notifications_email: emailEnabled,
-      onboarding_completed: true 
-    })
+    .update(updatePayload)
     .eq('id', user.id)
 
-  revalidatePath('/app/dashboard')
-  redirect('/app/dashboard')
+  if (isOnboarding) {
+    revalidatePath('/app/dashboard')
+    redirect('/app/dashboard')
+  } else {
+    revalidatePath('/web/settings')
+    redirect('/web/settings?success=1')
+  }
 }
 
 export async function submitWebOnboarding(formData: FormData) {
@@ -80,7 +91,8 @@ export async function submitWebOnboarding(formData: FormData) {
       user_type: userType, 
       quantity, 
       path_type: 'web',
-      onboarding_completed: true 
+      onboarding_completed: true,
+      tracker_started_at: new Date().toISOString()
     })
 
   if (error) {
@@ -98,7 +110,7 @@ export async function completeOnboarding() {
 
   await supabase
     .from('profiles')
-    .update({ onboarding_completed: true })
+    .update({ onboarding_completed: true, tracker_started_at: new Date().toISOString() })
     .eq('id', user.id)
     
   revalidatePath('/app/dashboard')
@@ -136,4 +148,67 @@ export async function updateWebSettings(formData: FormData) {
 
   revalidatePath('/web/dashboard')
   redirect('/web/settings?success=1')
+}
+
+// ── Caregiver: Dependent Management ──
+
+export async function addDependent(formData: FormData) {
+  const name = (formData.get('name') as string)?.trim()
+  const productSku = (formData.get('product_sku') as string) || 'OXI-TUB-07'
+  const quantity = parseInt(formData.get('quantity') as string) || 1
+
+  if (!name) return
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return redirect('/web/start')
+
+  await supabase
+    .from('dependents')
+    .insert({
+      caregiver_id: user.id,
+      name,
+      product_sku: productSku,
+      quantity,
+      last_replaced_at: new Date().toISOString(),
+    })
+
+  revalidatePath('/web/dashboard')
+  redirect('/web/dashboard?view=caregiver')
+}
+
+export async function markDependentReplaced(formData: FormData) {
+  const dependentId = formData.get('dependent_id') as string
+  if (!dependentId) return
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return redirect('/web/start')
+
+  await supabase
+    .from('dependents')
+    .update({ last_replaced_at: new Date().toISOString() })
+    .eq('id', dependentId)
+    .eq('caregiver_id', user.id)
+
+  revalidatePath('/web/dashboard')
+  redirect('/web/dashboard?view=caregiver')
+}
+
+export async function deleteDependent(formData: FormData) {
+  const dependentId = formData.get('dependent_id') as string
+  if (!dependentId) return
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return redirect('/web/start')
+
+  await supabase
+    .from('dependents')
+    .delete()
+    .eq('id', dependentId)
+    .eq('caregiver_id', user.id)
+
+  revalidatePath('/web/dashboard')
+  redirect('/web/dashboard?view=caregiver')
 }

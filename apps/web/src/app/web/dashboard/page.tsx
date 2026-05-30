@@ -3,7 +3,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
-import { ShoppingCart, ChevronRight, Bell, Calendar, Package, RefreshCw, AlertTriangle, CheckCircle2, Clock, History, Settings, LogOut, Users, HeartHandshake, UserPlus } from "lucide-react";
+import { ShoppingCart, ChevronRight, Bell, Calendar, Package, RefreshCw, AlertTriangle, CheckCircle2, Clock, History, Settings, LogOut, Users, HeartHandshake, UserPlus, Trash2, Plus, RotateCcw, Share2, ClipboardCopy, FileText, Heart } from "lucide-react";
+import { addDependent, markDependentReplaced, deleteDependent } from '@/app/actions';
+import { buildCartUrl, getDiscountTier, SHOPIFY_CONFIG } from '@/utils/shopify';
 import UserMenu from "@/components/user-menu";
 
 const BASE_CYCLE_DAYS = 30;
@@ -36,21 +38,38 @@ function formatDate(date: Date) {
 }
 
 export default async function WebDashboard({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
+  console.log('[Dashboard] 🏁 Starting server component render...')
   const resolvedParams = await searchParams;
   const supabase = await createClient()
+  
+  console.log('[Dashboard] 🔑 Fetching active user from Supabase...')
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return redirect('/web/start')
+  console.log('[Dashboard] 👤 Active user result:', user ? user.email : 'No active session')
+  
+  if (!user) {
+    console.log('[Dashboard] 🛑 No user found, redirecting to /web/start')
+    return redirect('/web/start')
+  }
 
+  console.log(`[Dashboard] 📦 Fetching user profile from db for UUID: ${user.id}...`)
   const { data: profile } = await supabase
     .from('profiles').select('*').eq('id', user.id).single()
+  console.log('[Dashboard] 📄 Profile fetch finished. Profile found:', !!profile)
 
   const isAdmin = profile?.is_admin === true;
 
-  if (!profile?.onboarding_completed && !profile?.order_verified) return redirect('/activate')
-  if (!profile?.onboarding_completed) return redirect('/web/onboarding')
+  if (!profile?.onboarding_completed && !profile?.order_verified) {
+    console.log('[Dashboard] 🚨 Profile incomplete, redirecting to /activate')
+    return redirect('/activate')
+  }
+  if (!profile?.onboarding_completed) {
+    console.log('[Dashboard] 📋 Onboarding incomplete, redirecting to /web/onboarding')
+    return redirect('/web/onboarding')
+  }
 
   const quantity = profile?.quantity ?? 1;
-  const { daysLeft, reorderDays, elapsed, cycleNumber } = computeTimeLeft(profile?.created_at ?? null, quantity);
+  const trackerAnchor = profile?.tracker_started_at ?? profile?.created_at ?? null;
+  const { daysLeft, reorderDays, elapsed, cycleNumber } = computeTimeLeft(trackerAnchor, quantity);
   const status = getStatus(daysLeft);
   const progress = Math.max(0, Math.min(100, ((BASE_CYCLE_DAYS - daysLeft) / BASE_CYCLE_DAYS) * 100));
 
@@ -86,8 +105,8 @@ export default async function WebDashboard({ searchParams }: { searchParams: Pro
 
   // Generate swap history (calculated from created_at)
   const swapHistory: { date: string; cycle: number; status: string }[] = [];
-  if (profile?.created_at) {
-    const startDate = new Date(profile.created_at);
+  if (trackerAnchor) {
+    const startDate = new Date(trackerAnchor);
     for (let c = 1; c < cycleNumber; c++) {
       const swapDate = new Date(startDate);
       swapDate.setDate(startDate.getDate() + (c * BASE_CYCLE_DAYS));
@@ -101,8 +120,99 @@ export default async function WebDashboard({ searchParams }: { searchParams: Pro
   }
 
   const supplyWarning = reorderDays <= 14;
+  const reorderTier = getDiscountTier(reorderDays);
+  const cartUrl = buildCartUrl(quantity, reorderDays, 'web');
   const isCaregiver = profile?.user_type === 'caregiver';
   const activeView = isCaregiver && resolvedParams.view === 'caregiver' ? 'caregiver' : 'self';
+
+  // ── Fetch dependents for caregiver view ──
+  type Dependent = {
+    id: string;
+    name: string;
+    product_sku: string | null;
+    quantity: number | null;
+    last_replaced_at: string | null;
+    notes: string | null;
+    created_at: string | null;
+  };
+  let dependents: Dependent[] = [];
+  if (isCaregiver) {
+    const { data } = await supabase
+      .from('dependents')
+      .select('*')
+      .eq('caregiver_id', user.id)
+      .order('created_at', { ascending: true });
+    dependents = (data as Dependent[]) || [];
+  }
+
+  // Helper: compute days left for a dependent
+  function getDependentStatus(lastReplaced: string | null) {
+    if (!lastReplaced) return { daysLeft: 0, progress: 100, color: 'red' as const, label: 'Replace Now' };
+    const elapsed = Math.max(0, Date.now() - new Date(lastReplaced).getTime());
+    const dLeft = Math.max(0, BASE_CYCLE_DAYS - Math.floor(elapsed / 86400000));
+    const prog = Math.max(0, Math.min(100, ((BASE_CYCLE_DAYS - dLeft) / BASE_CYCLE_DAYS) * 100));
+    const col = dLeft > 7 ? 'emerald' as const : dLeft > 0 ? 'amber' as const : 'red' as const;
+    const lbl = dLeft > 7 ? 'On Track' : dLeft > 0 ? 'Due Soon' : 'Replace Now';
+    return { daysLeft: dLeft, progress: prog, color: col, label: lbl };
+  }
+
+  // Sort by urgency: Replace Now → Due Soon → On Track
+  const sortedDependents = [...dependents].sort((a, b) => getDependentStatus(a.last_replaced_at).daysLeft - getDependentStatus(b.last_replaced_at).daysLeft);
+  const needsAttention = dependents.filter(d => getDependentStatus(d.last_replaced_at).daysLeft <= 7).length;
+  const urgentDeps = dependents.filter(d => getDependentStatus(d.last_replaced_at).daysLeft <= 3);
+  const lowSupplyCount = dependents.filter(d => getDependentStatus(d.last_replaced_at).daysLeft <= 14).length;
+
+  // ── Conflict Detection & Priority Resolution ──
+  type ConflictGroup = {
+    entries: { id: string; name: string; daysLeft: number }[];
+    suggestedBatchDate: string;
+  };
+
+  function detectScheduleConflicts(deps: Dependent[], windowDays: number = 3): ConflictGroup[] {
+    if (deps.length < 2) return [];
+    const entries = deps.map(d => ({
+      id: d.id, name: d.name,
+      daysLeft: getDependentStatus(d.last_replaced_at).daysLeft,
+    })).sort((a, b) => a.daysLeft - b.daysLeft);
+
+    const groups: ConflictGroup[] = [];
+    let current: typeof entries = [entries[0]];
+
+    for (let i = 1; i < entries.length; i++) {
+      if (entries[i].daysLeft - current[current.length - 1].daysLeft <= windowDays) {
+        current.push(entries[i]);
+      } else {
+        if (current.length > 1) {
+          const avg = Math.round(current.reduce((s, e) => s + e.daysLeft, 0) / current.length);
+          const d = new Date(); d.setDate(d.getDate() + avg);
+          groups.push({ entries: [...current], suggestedBatchDate: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) });
+        }
+        current = [entries[i]];
+      }
+    }
+    if (current.length > 1) {
+      const avg = Math.round(current.reduce((s, e) => s + e.daysLeft, 0) / current.length);
+      const d = new Date(); d.setDate(d.getDate() + avg);
+      groups.push({ entries: [...current], suggestedBatchDate: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) });
+    }
+    return groups;
+  }
+
+  type PriorityLevel = 'critical' | 'high' | 'medium' | 'low';
+  function getPriorityLevel(daysLeft: number): PriorityLevel {
+    if (daysLeft <= 0) return 'critical';
+    if (daysLeft <= 3) return 'high';
+    if (daysLeft <= 7) return 'medium';
+    return 'low';
+  }
+  const PRIORITY_CFG: Record<PriorityLevel, { color: string; bg: string; border: string; label: string }> = {
+    critical: { color: 'text-red-700', bg: 'bg-red-50', border: 'border-red-200', label: 'P0' },
+    high:     { color: 'text-orange-700', bg: 'bg-orange-50', border: 'border-orange-200', label: 'P1' },
+    medium:   { color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200', label: 'P2' },
+    low:      { color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200', label: 'P3' },
+  };
+
+  const conflicts = detectScheduleConflicts(dependents);
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col">
@@ -220,10 +330,10 @@ export default async function WebDashboard({ searchParams }: { searchParams: Pro
             </div>
             <div className="flex-1">
               <p className="text-sm font-bold text-amber-800">Supply running low</p>
-              <p className="text-xs text-amber-600">Your full supply of {quantity} tube{quantity > 1 ? 's' : ''} runs out on <strong>{formatDate(supplyEnd)}</strong> ({reorderDays} days). Order now to avoid a gap.</p>
+              <p className="text-xs text-amber-600">Your full supply of {quantity} tube{quantity > 1 ? 's' : ''} runs out on <strong>{formatDate(supplyEnd)}</strong> ({reorderDays} days). Use code <strong>{reorderTier.code}</strong> for {reorderTier.percent}% off.</p>
             </div>
             <a
-              href="https://oxisuretechsolutions.com/products/oxygen-tubing-50-ft-non-kinking-high-flow-hose"
+              href={cartUrl}
               target="_blank" rel="noopener noreferrer"
               className="shrink-0 px-4 py-2 bg-amber-600 text-white text-xs font-bold rounded-lg hover:bg-amber-700 transition-all min-h-0"
             >
@@ -348,7 +458,7 @@ export default async function WebDashboard({ searchParams }: { searchParams: Pro
 
             {/* Quick Actions */}
             <a
-              href="https://oxisuretechsolutions.com/products/oxygen-tubing-50-ft-non-kinking-high-flow-hose"
+              href={cartUrl}
               target="_blank" rel="noopener noreferrer"
               className="group flex items-center gap-3.5 p-4 rounded-2xl bg-white border border-[#E2E8F0] shadow-sm hover:shadow-md transition-all"
             >
@@ -357,7 +467,7 @@ export default async function WebDashboard({ searchParams }: { searchParams: Pro
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold text-[#0F172A]">Reorder Supplies</p>
-                <p className="text-xs text-[#94A3B8]">Order before you run out</p>
+                <p className="text-xs text-[#94A3B8]">Save {reorderTier.percent}% with code {reorderTier.code}</p>
               </div>
               <ChevronRight size={16} className="text-[#CBD5E1] group-hover:translate-x-1 transition-transform shrink-0" />
             </a>
@@ -381,7 +491,7 @@ export default async function WebDashboard({ searchParams }: { searchParams: Pro
                   ['Email', user.email || '—'],
                   ['Product', profile?.product_sku || 'OXI-TUB-07'],
                   ['Qty/cycle', `${quantity} tube${quantity > 1 ? 's' : ''}`],
-                  ['Tracking since', profile?.created_at ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—'],
+                  ['Tracking since', trackerAnchor ? new Date(trackerAnchor).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—'],
                 ].map(([label, value]) => (
                   <div key={label} className="flex justify-between items-center py-1">
                     <span className="text-xs text-[#94A3B8]">{label}</span>
@@ -393,50 +503,260 @@ export default async function WebDashboard({ searchParams }: { searchParams: Pro
           </div>
         </div>
         </>) : (
-          /* ── Caregiver View: Coming Soon ── */
-          <div className="max-w-2xl mx-auto">
-            <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm overflow-hidden">
-              {/* Hero illustration area */}
-              <div className="bg-gradient-to-br from-[#0f172a] via-[#152244] to-[#1B365D] px-8 py-12 text-center relative overflow-hidden">
-                <div className="absolute -right-16 -top-16 w-56 h-56 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
-                <div className="absolute -left-16 -bottom-16 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
-                <div className="relative z-10">
-                  <div className="w-20 h-20 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center mx-auto mb-5 backdrop-blur-sm">
-                    <Users size={36} className="text-white" />
-                  </div>
-                  <h2 className="text-2xl font-bold text-white mb-2">Caregiver Management</h2>
-                  <p className="text-sm text-slate-300 max-w-md mx-auto leading-relaxed">
-                    Manage replacement schedules for your loved ones — all in one place.
-                  </p>
+          /* ── Caregiver View: Full Management ── */
+          <div className="max-w-4xl">
+            {/* Caregiver Greeting + Share */}
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2">
+                <Heart size={18} className="text-rose-500" />
+                <h2 className="text-lg font-extrabold text-[#0F172A]">Managing {dependents.length} {dependents.length === 1 ? 'person' : 'people'}</h2>
+              </div>
+              {dependents.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const lines = sortedDependents.map(d => {
+                      const ds = getDependentStatus(d.last_replaced_at);
+                      const next = new Date(); next.setDate(next.getDate() + ds.daysLeft);
+                      return `• ${d.name} — ${ds.label} (${ds.daysLeft} days left, next due ${next.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`;
+                    });
+                    const msg = `OxiSure Caregiver Summary\n${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}\n\n${lines.join('\n')}\n\nManaging ${dependents.length} ${dependents.length === 1 ? 'person' : 'people'}`;
+                    navigator.clipboard?.writeText(msg);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#F0F9FF] border border-[#BAE6FD] text-xs font-semibold text-[#0C5A8A] hover:bg-[#E0F2FE] transition-colors"
+                >
+                  <ClipboardCopy size={13} />
+                  Copy Summary
+                </button>
+              )}
+            </div>
+
+            {/* Urgent Alert Banner */}
+            {urgentDeps.length > 0 && (
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-red-50 border border-red-200 mb-5">
+                <AlertTriangle size={20} className="text-red-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-bold text-red-700 mb-0.5">Immediate attention needed</p>
+                  <p className="text-xs text-red-600">{urgentDeps.map(d => d.name).join(', ')} — tubing overdue or due within 3 days</p>
                 </div>
               </div>
+            )}
 
-              {/* Feature preview cards */}
-              <div className="p-6 lg:p-8">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-                  {[
-                    { icon: UserPlus, title: 'Add People', desc: 'Track schedules for family members or patients', color: 'text-blue-600', bg: 'bg-blue-50' },
-                    { icon: Bell, title: 'Smart Alerts', desc: 'Get reminders when their tubing needs replacing', color: 'text-violet-600', bg: 'bg-violet-50' },
-                    { icon: ShoppingCart, title: 'Bulk Reorder', desc: 'One-tap ordering for everyone you manage', color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                  ].map((f) => (
-                    <div key={f.title} className="p-4 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0]">
-                      <div className={`w-10 h-10 rounded-xl ${f.bg} flex items-center justify-center mb-3`}>
-                        <f.icon size={20} className={f.color} />
-                      </div>
-                      <p className="text-sm font-bold text-[#0F172A] mb-1">{f.title}</p>
-                      <p className="text-xs text-[#94A3B8] leading-relaxed">{f.desc}</p>
+            {/* Scheduling Conflict Detection */}
+            {conflicts.length > 0 && (
+              <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 mb-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-lg">⚡</span>
+                  <h3 className="text-sm font-bold text-amber-900">Scheduling Overlaps Detected</h3>
+                </div>
+                {conflicts.map((group, idx) => (
+                  <div key={idx} className="flex items-center gap-3 bg-white rounded-lg p-3 border border-amber-200 mb-2">
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-amber-900">{group.entries.map(e => e.name).join(' & ')}</p>
+                      <p className="text-xs text-amber-600">Due within {Math.abs(group.entries[group.entries.length - 1].daysLeft - group.entries[0].daysLeft)} days of each other</p>
                     </div>
-                  ))}
-                </div>
-
-                <div className="text-center">
-                  <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#F0F9FF] border border-[#BAE6FD]">
-                    <span className="text-sm">🚀</span>
-                    <span className="text-sm font-bold text-[#0C5A8A]">Coming Soon</span>
+                    <div className="text-center bg-amber-100 rounded-lg px-3 py-1.5 shrink-0">
+                      <p className="text-[9px] font-bold text-amber-600 uppercase tracking-wider">Batch on</p>
+                      <p className="text-xs font-bold text-amber-900">{group.suggestedBatchDate}</p>
+                    </div>
                   </div>
-                  <p className="text-xs text-[#94A3B8] mt-3">We&apos;re building this feature right now. Stay tuned!</p>
-                </div>
+                ))}
+                <p className="text-[11px] text-amber-600 mt-1">💡 Replace these together to simplify your schedule</p>
               </div>
+            )}
+
+            {/* Bulk Reorder CTA */}
+            {lowSupplyCount > 0 && (
+              <a href={buildCartUrl(lowSupplyCount, Math.min(...dependents.map(d => getDependentStatus(d.last_replaced_at).daysLeft)), 'web')} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-3 p-4 rounded-xl bg-gradient-to-r from-[#0EA5E9] to-[#0284C7] mb-5 hover:opacity-95 transition-opacity shadow-sm">
+                <Package size={20} className="text-white shrink-0" />
+                <div>
+                  <p className="text-sm font-bold text-white">{lowSupplyCount} {lowSupplyCount === 1 ? 'person needs' : 'people need'} supplies soon</p>
+                  <p className="text-xs text-white/80">Order replacement tubing for everyone →</p>
+                </div>
+              </a>
+            )}
+
+            {/* Stats Row */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
+              <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 shadow-sm">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center">
+                    <Users size={18} className="text-blue-600" />
+                  </div>
+                  <span className="text-xs font-semibold text-[#94A3B8] uppercase tracking-wider">People</span>
+                </div>
+                <p className="text-3xl font-extrabold text-[#0F172A] tabular-nums">{dependents.length}</p>
+              </div>
+              <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 shadow-sm">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center">
+                    <CheckCircle2 size={18} className="text-emerald-600" />
+                  </div>
+                  <span className="text-xs font-semibold text-[#94A3B8] uppercase tracking-wider">On Track</span>
+                </div>
+                <p className="text-3xl font-extrabold text-[#0F172A] tabular-nums">{dependents.length - needsAttention}</p>
+              </div>
+              <div className="bg-white rounded-2xl border border-[#E2E8F0] p-5 shadow-sm">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${needsAttention > 0 ? 'bg-amber-50' : 'bg-slate-50'}`}>
+                    <AlertTriangle size={18} className={needsAttention > 0 ? 'text-amber-600' : 'text-slate-400'} />
+                  </div>
+                  <span className="text-xs font-semibold text-[#94A3B8] uppercase tracking-wider">Needs Attention</span>
+                </div>
+                <p className={`text-3xl font-extrabold tabular-nums ${needsAttention > 0 ? 'text-amber-600' : 'text-[#0F172A]'}`}>{needsAttention}</p>
+              </div>
+            </div>
+
+            {/* Dependent Cards */}
+            {sortedDependents.length > 0 ? (
+              <div className="space-y-4 mb-6">
+                {sortedDependents.map((dep) => {
+                  const ds = getDependentStatus(dep.last_replaced_at);
+                  const ringColor = ds.color === 'emerald' ? '#10b981' : ds.color === 'amber' ? '#f59e0b' : '#ef4444';
+                  const nextSwapDate = new Date();
+                  nextSwapDate.setDate(nextSwapDate.getDate() + ds.daysLeft);
+                  const badgeCls = ds.color === 'emerald'
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : ds.color === 'amber'
+                    ? 'bg-amber-50 text-amber-700 border-amber-200'
+                    : 'bg-red-50 text-red-700 border-red-200';
+
+                  return (
+                    <div key={dep.id} className="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+                      <div className="flex flex-col sm:flex-row items-stretch">
+                        {/* Left: Mini ring + info */}
+                        <div className="flex items-center gap-5 p-5 sm:p-6 flex-1">
+                          {/* Mini progress ring */}
+                          <div className="relative w-16 h-16 shrink-0">
+                            <svg viewBox="0 0 60 60" className="w-full h-full -rotate-90">
+                              <circle cx="30" cy="30" r="25" fill="none" stroke="#F1F5F9" strokeWidth="4" />
+                              <circle cx="30" cy="30" r="25" fill="none" stroke={ringColor} strokeWidth="4" strokeLinecap="round"
+                                strokeDasharray={`${(1 - ds.progress / 100) * 157} 157`}
+                              />
+                            </svg>
+                            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                              <span className="text-lg font-extrabold text-[#0F172A] leading-none">{ds.daysLeft}</span>
+                              <span className="text-[9px] text-[#94A3B8]">days</span>
+                            </div>
+                          </div>
+
+                          {/* Info */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="text-base font-bold text-[#0F172A] truncate">{dep.name}</h3>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${badgeCls}`}>{ds.label}</span>
+                              <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded border ${PRIORITY_CFG[getPriorityLevel(ds.daysLeft)].bg} ${PRIORITY_CFG[getPriorityLevel(ds.daysLeft)].border} ${PRIORITY_CFG[getPriorityLevel(ds.daysLeft)].color}`}>{PRIORITY_CFG[getPriorityLevel(ds.daysLeft)].label}</span>
+                              {dep.notes && dep.notes.trim() !== '' && (
+                                <span className="text-[10px] text-[#94A3B8]" title={dep.notes}>📝</span>
+                              )}
+                            </div>
+                            <p className="text-xs text-[#94A3B8]">
+                              {dep.product_sku || 'OXI-TUB-07'} · Qty: {dep.quantity || 1} · Next swap {formatDate(nextSwapDate)}
+                            </p>
+                            {dep.last_replaced_at && (
+                              <p className="text-[11px] text-[#CBD5E1] mt-0.5">
+                                Last replaced {new Date(dep.last_replaced_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Right: Actions */}
+                        <div className="flex sm:flex-col items-center gap-2 px-5 py-3 sm:py-5 sm:border-l border-t sm:border-t-0 border-[#F1F5F9] bg-[#FAFBFC]">
+                          <form action={markDependentReplaced}>
+                            <input type="hidden" name="dependent_id" value={dep.id} />
+                            <button
+                              type="submit"
+                              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition-colors whitespace-nowrap"
+                            >
+                              <RotateCcw size={13} />
+                              Replaced
+                            </button>
+                          </form>
+                          <form action={deleteDependent}>
+                            <input type="hidden" name="dependent_id" value={dep.id} />
+                            <button
+                              type="submit"
+                              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-red-500 hover:bg-red-50 border border-transparent hover:border-red-200 transition-colors whitespace-nowrap"
+                            >
+                              <Trash2 size={13} />
+                              Remove
+                            </button>
+                          </form>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              /* Empty state */
+              <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm p-10 text-center mb-6">
+                <div className="w-16 h-16 rounded-2xl bg-[#F1F5F9] flex items-center justify-center mx-auto mb-4">
+                  <Users size={28} className="text-[#94A3B8]" />
+                </div>
+                <h3 className="text-lg font-bold text-[#0F172A] mb-1">No people added yet</h3>
+                <p className="text-sm text-[#94A3B8] max-w-sm mx-auto">Add family members or patients below to start tracking their tubing replacement schedules.</p>
+              </div>
+            )}
+
+            {/* Add Person Form */}
+            <div className="bg-white rounded-2xl border-2 border-dashed border-[#E2E8F0] shadow-sm overflow-hidden">
+              <form action={addDependent}>
+                <div className="p-5 sm:p-6">
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+                      <Plus size={18} className="text-blue-600" />
+                    </div>
+                    <h3 className="text-sm font-bold text-[#0F172A]">Add a Person</h3>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-[#94A3B8] uppercase tracking-wider mb-1.5">Name *</label>
+                      <input
+                        type="text"
+                        name="name"
+                        required
+                        placeholder="e.g. Mom, John"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] text-sm text-[#0F172A] placeholder:text-[#CBD5E1] focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-[#94A3B8] uppercase tracking-wider mb-1.5">Product</label>
+                      <select
+                        name="product_sku"
+                        defaultValue="OXI-TUB-07"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] text-sm text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 transition-all"
+                      >
+                        <option value="OXI-TUB-07">Standard Tubing (7ft)</option>
+                        <option value="OXI-TUB-25">Extended Tubing (25ft)</option>
+                        <option value="OXI-TUB-50">Premium Tubing (50ft)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-[#94A3B8] uppercase tracking-wider mb-1.5">Quantity</label>
+                      <input
+                        type="number"
+                        name="quantity"
+                        defaultValue={1}
+                        min={1}
+                        max={12}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] text-sm text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300 transition-all"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="px-5 sm:px-6 py-4 bg-[#F8FAFC] border-t border-[#E2E8F0]">
+                  <button
+                    type="submit"
+                    className="flex items-center gap-2 px-5 py-2.5 bg-[#1B365D] text-white text-sm font-bold rounded-xl hover:bg-[#152244] transition-colors shadow-sm"
+                  >
+                    <UserPlus size={15} />
+                    Add Person
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}

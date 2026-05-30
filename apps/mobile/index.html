@@ -45,6 +45,11 @@
   </head>
   <body>
     <div id="root"></div>
+    <script type="module">
+      // Buffer polyfill — required by @supabase/supabase-js dependency chain
+      import { Buffer as BufferPolyfill } from 'buffer';
+      window.Buffer = window.Buffer || BufferPolyfill;
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

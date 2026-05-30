@@ -34,6 +34,7 @@ export default function NotificationsScreen() {
         notifications_push: pushEnabled,
         notifications_email: emailEnabled,
         onboarding_completed: true,
+        tracker_started_at: new Date().toISOString(),
       })
       .eq('id', user.id);
 

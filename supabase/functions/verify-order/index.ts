@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 
-// Basic Edge Function to verify an Amazon or Shopify Order ID
-// In production, this would connect to Shopify Admin API and Amazon SP-API.
+// Edge Function to verify a Shopify Order ID.
+// In production, this would connect to Shopify Admin API.
 serve(async (req) => {
   // CORS headers
   if (req.method === 'OPTIONS') {
@@ -18,24 +18,20 @@ serve(async (req) => {
       return new Response(JSON.stringify({ success: false, error: "Order ID is required" }), { status: 400, headers: { "Access-Control-Allow-Origin": "*" } })
     }
 
-    // Determine platform and validate format
-    // Amazon format: 111-1234567-1234567 (3 digits - 7 digits - 7 digits)
-    const isAmazon = /^\d{3}-\d{7}-\d{7}$/.test(orderId);
-    
-    // Shopify format mock: usually numbers or a prefix like OXI-1234
-    const isShopify = /^(OXI-)?\d+$/i.test(orderId);
+    // Shopify order format: numbers, or a prefix like OXI-1234, or #1234
+    const isShopify = /^#?(\d+|OXI-\d+)$/i.test(orderId.trim());
 
-    if (!isAmazon && !isShopify) {
+    if (!isShopify) {
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: "Invalid Order ID format. Please use a valid Amazon (e.g. 111-1234567-1234567) or Shopify order number." 
+          error: "Invalid Order ID format. Please enter your Shopify order number (e.g. #1234 or OXI-1234)." 
         }),
         { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
       )
     }
 
-    // TODO: Actually fetch the order from Shopify/Amazon SP-API to ensure it contains Oxygen Tubing
+    // TODO: Actually fetch the order from Shopify Admin API to ensure it contains Oxygen Tubing
     // For now, we mock a successful verification if the format is correct
     
     // Artificial delay to simulate API request
@@ -44,7 +40,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: true,
-        platform: isAmazon ? 'amazon' : 'shopify',
+        platform: 'shopify',
         product: 'OxiSure Oxygen Tubing'
       }),
       { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }

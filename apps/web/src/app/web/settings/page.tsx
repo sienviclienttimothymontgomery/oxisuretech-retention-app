@@ -147,7 +147,7 @@ export default async function WebSettings({ searchParams }: { searchParams: Prom
                 'use server';
                 const push = formData.get('push') === 'on';
                 const email = formData.get('email') === 'on';
-                await submitNotifications(push, email);
+                await submitNotifications(push, email, false);
               }} className="space-y-4">
                 <div className="flex items-center justify-between p-4 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0]">
                   <div className="flex items-center gap-3">

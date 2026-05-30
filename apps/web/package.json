@@ -2,6 +2,9 @@
   "name": "web",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "22"
+  },
   "scripts": {
     "dev": "next dev",
     "prebuild": "npm install @tailwindcss/oxide-linux-x64-gnu --no-save --force",
@@ -17,6 +20,9 @@
     "@radix-ui/react-switch": "^1.2.6",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.103.3",
+    "acorn": "^8.16.0",
+    "@types/markdown-it": "^14.1.2",
+    "markdown-it": "^14.2.0",
     "lucide-react": "^1.7.0",
     "next": "^15.5.7",
     "react": "19.1.0",

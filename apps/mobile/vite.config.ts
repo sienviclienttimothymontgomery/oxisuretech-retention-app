@@ -38,6 +38,7 @@ export default defineConfig({
     'process.env': {}
   },
   optimizeDeps: {
+    include: ['react-native-web', '@capacitor/core', 'buffer'],
     exclude: ['react-native-svg'],
   },
   build: {

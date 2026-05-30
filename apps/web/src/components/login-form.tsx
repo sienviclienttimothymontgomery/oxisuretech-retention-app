@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import Button from '@/components/ui/Button'
 import InputField from '@/components/ui/InputField'
@@ -8,11 +9,14 @@ import InputField from '@/components/ui/InputField'
 export default function LoginForm({ type, redirectTo }: { type: 'app' | 'web'; redirectTo?: string }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [fullName, setFullName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [webMode, setWebMode] = useState<'password' | 'magic'>('password')
+  const [formMode, setFormMode] = useState<'signin' | 'signup'>('signin')
   const supabase = createClient()
+  const router = useRouter()
 
   const destination = type === 'web' ? '/web/dashboard' : (redirectTo ?? '/app/dashboard')
 
@@ -67,35 +71,69 @@ export default function LoginForm({ type, redirectTo }: { type: 'app' | 'web'; r
         }
       }
 
-      window.location.href = '/web/check-email'
+      router.push('/web/check-email')
+      return
     } else {
       // Password login (works for both app and web)
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-      if (error) setError(error.message)
-      else {
-        window.location.href = destination
+      try {
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        })
+        if (error) {
+          setError(error.message)
+        } else {
+          window.location.href = destination
+          return
+        }
+      } catch (err: any) {
+        console.error('Password signin error:', err)
+        setError(err?.message || 'A connection error occurred. Please try again.')
       }
     }
     setLoading(false)
   }
 
   const handleSignUp = async () => {
+    if (formMode === 'signup' && !fullName.trim()) {
+      setError('Please enter your full name.')
+      return
+    }
+    if (!email) {
+      setError('Please enter your email address to create an account.')
+      return
+    }
+    if (!password || password.length < 6) {
+      setError('Please enter a password (at least 6 characters) to create your account.')
+      return
+    }
     setLoading(true)
     setError(null)
     setMessage(null)
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=${destination}`,
-      },
-    })
-    if (error) setError(error.message)
-    else setMessage('Check your email to confirm your account.')
-    setLoading(false)
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=${destination}`,
+          data: {
+            full_name: fullName.trim(),
+          }
+        },
+      })
+      if (error) {
+        setError(error.message)
+      } else if (data?.user?.identities?.length === 0) {
+        setError('An account with this email already exists. Try signing in instead.')
+      } else {
+        setMessage('Account created! Check your email to confirm, then sign in.')
+      }
+    } catch (err: any) {
+      console.error('Signup error:', err)
+      setError(err?.message || 'A network error occurred. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleForgotPassword = async () => {
@@ -113,10 +151,17 @@ export default function LoginForm({ type, redirectTo }: { type: 'app' | 'web'; r
     setLoading(false)
   }
 
-  const showPasswordField = type === 'app' || webMode === 'password'
+  const showPasswordField = type === 'app' || webMode === 'password' || formMode === 'signup'
 
   return (
-    <div className="w-full flex flex-col gap-5">
+    <div className={`w-full flex flex-col gap-5 p-1 rounded-2xl transition-all duration-300 ${formMode === 'signup' ? 'border-t-4 border-[#0EA5E9]' : ''}`}>
+      {formMode === 'signup' && (
+        <div className="text-center mt-2">
+          <h2 className="text-xl font-bold text-[#0F172A] mb-1">Create your account</h2>
+          <p className="text-xs text-[#64748B]">Set up your OxiSure credentials to get started.</p>
+        </div>
+      )}
+
       {/* Error / Success Messages */}
       {error && (
         <div className="text-sm text-center p-3.5 bg-red-50 border border-red-200 rounded-xl text-red-600 font-medium">
@@ -130,7 +175,7 @@ export default function LoginForm({ type, redirectTo }: { type: 'app' | 'web'; r
       )}
       
       {/* Web mode toggle — pill style */}
-      {type === 'web' && (
+      {type === 'web' && formMode === 'signin' && (
         <div className="flex p-1 rounded-xl bg-[#F1F5F9] border border-[#E2E8F0]">
           <button
             type="button"
@@ -158,7 +203,17 @@ export default function LoginForm({ type, redirectTo }: { type: 'app' | 'web'; r
       )}
 
       {/* Form */}
-      <form onSubmit={handleEmailLogin} className="flex flex-col gap-4">
+      <form onSubmit={formMode === 'signin' ? handleEmailLogin : (e) => { e.preventDefault(); handleSignUp(); }} className="flex flex-col gap-4">
+        {formMode === 'signup' && (
+          <InputField
+            label="Full name"
+            type="text"
+            placeholder="e.g. John Doe"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            required
+          />
+        )}
         <InputField
           label="Email address"
           type="email"
@@ -175,53 +230,74 @@ export default function LoginForm({ type, redirectTo }: { type: 'app' | 'web'; r
               onChange={(e) => setPassword(e.target.value)}
               required
             />
-            <div className="flex justify-end mt-1.5">
-              <button
-                type="button"
-                onClick={handleForgotPassword}
-                className="text-xs font-medium text-[#0EA5E9] hover:text-[#0284C7] transition-colors min-h-0"
-              >
-                Forgot password?
-              </button>
-            </div>
+            {formMode === 'signin' && (
+              <div className="flex justify-end mt-1.5">
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  className="text-xs font-medium text-[#0EA5E9] hover:text-[#0284C7] transition-colors min-h-0"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
           </div>
         )}
         <Button type="submit" loading={loading} fullWidth>
-          {type === 'web' && webMode === 'magic' ? '✉️ Send Magic Link' : 'Sign In'}
+          {formMode === 'signup'
+            ? 'Create Account'
+            : (type === 'web' && webMode === 'magic' ? '✉️ Send Magic Link' : 'Sign In')
+          }
         </Button>
       </form>
 
-      {/* Sign Up CTA */}
-      {showPasswordField && (
-        <div className="text-center py-3 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
-          <p className="text-sm text-[#64748B]">
-            Don&apos;t have an account?{' '}
-            <button 
-              type="button" 
-              onClick={handleSignUp}
-              className="font-bold text-[#1B365D] hover:text-[#0EA5E9] transition-colors min-h-0"
-              disabled={loading}
-            >
-              Create one →
-            </button>
-          </p>
-        </div>
-      )}
-
-      {/* Divider */}
-      <div className="relative my-1">
-        <div className="absolute inset-0 flex items-center">
-          <span className="w-full border-t border-[#E2E8F0]" />
-        </div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-white px-3 text-[#94A3B8] font-medium tracking-wider">
-            or continue with
-          </span>
-        </div>
+      {/* Sign Up / Sign In CTA */}
+      <div className="text-center py-3 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
+        <p className="text-sm text-[#64748B]">
+          {formMode === 'signin' ? (
+            <>
+              Don&apos;t have an account?{' '}
+              <button 
+                type="button" 
+                onClick={() => { setError(null); setMessage(null); setFormMode('signup'); }}
+                className="font-bold text-[#1B365D] hover:text-[#0EA5E9] transition-colors min-h-0"
+                disabled={loading}
+              >
+                Create one →
+              </button>
+            </>
+          ) : (
+            <>
+              Already have an account?{' '}
+              <button 
+                type="button" 
+                onClick={() => { setError(null); setMessage(null); setFormMode('signin'); }}
+                className="font-bold text-[#1B365D] hover:text-[#0EA5E9] transition-colors min-h-0"
+                disabled={loading}
+              >
+                Sign in →
+              </button>
+            </>
+          )}
+        </p>
       </div>
 
-      {/* OAuth Buttons */}
-      <div className="flex gap-3">
+      {formMode === 'signin' && (
+        <>
+          {/* Divider */}
+          <div className="relative my-1">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-[#E2E8F0]" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-white px-3 text-[#94A3B8] font-medium tracking-wider">
+                or continue with
+              </span>
+            </div>
+          </div>
+
+          {/* OAuth Buttons */}
+          <div className="flex gap-3">
         {/* Google */}
         <button
           type="button"
@@ -252,6 +328,8 @@ export default function LoginForm({ type, redirectTo }: { type: 'app' | 'web'; r
           Apple
         </button>
       </div>
+      </>
+      )}
     </div>
   )
 }

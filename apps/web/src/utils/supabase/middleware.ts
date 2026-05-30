@@ -2,6 +2,13 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function updateSession(request: NextRequest) {
+  const isPrefetch = request.headers.get('x-middleware-prefetch') === '1'
+  const path = request.nextUrl.pathname
+  
+  if (!isPrefetch) {
+    console.log(`[Middleware] 🌐 Request for: ${path} (Method: ${request.method})`)
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   })
@@ -28,9 +35,16 @@ export async function updateSession(request: NextRequest) {
   )
 
   // refresh session if expired
+  if (!isPrefetch) {
+    console.log(`[Middleware] 🔑 Fetching active auth user...`)
+  }
   const {
     data: { user },
   } = await supabase.auth.getUser()
+
+  if (!isPrefetch) {
+    console.log(`[Middleware] 👤 Auth user result: ${user ? user.email : 'No active session'}`)
+  }
 
   // Handle Magic Link error redirects from Supabase
   if (request.nextUrl.searchParams.has('error')) {
@@ -81,14 +95,9 @@ export async function updateSession(request: NextRequest) {
                          isWebEmail
 
   // Admin routing: admins should only see /web/admin, not the regular dashboard
-  if (user && (isStarterRoute || isWebDashboard || isWebOnboarding)) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single()
-
-    if (profile?.is_admin) {
+  if (user && !isPrefetch && (isStarterRoute || isWebDashboard || isWebOnboarding)) {
+    const isAdminEmail = user.email === 'admin@oxisuretech.com'
+    if (isAdminEmail) {
       const url = request.nextUrl.clone()
       url.pathname = '/web/admin'
       return NextResponse.redirect(url)

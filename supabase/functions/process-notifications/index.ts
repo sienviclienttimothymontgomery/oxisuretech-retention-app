@@ -8,6 +8,32 @@ const FCM_SERVER_KEY = Deno.env.get("FCM_SERVER_KEY") // For Android/iOS push vi
 
 const BASE_CYCLE_DAYS = 30;
 
+// ── Shopify integration constants ────────────────────────────────────────────
+const SHOPIFY_STORE = 'https://oxisuretechsolutions.com';
+const SHOPIFY_VARIANT_ID = 42726807863385;
+
+function getDiscountForDays(daysLeft: number): { code: string; percent: number } {
+  if (daysLeft <= 0) return { code: 'COMEBACK20', percent: 20 };
+  if (daysLeft <= 7) return { code: 'RUSH15', percent: 15 };
+  if (daysLeft <= 30) return { code: 'DUESOON12', percent: 12 };
+  return { code: 'REORDER10', percent: 10 };
+}
+
+function buildCartUrl(quantity: number, daysLeft: number, source: 'email' | 'push'): string {
+  const { code } = getDiscountForDays(daysLeft);
+  const qty = Math.max(1, quantity);
+  const base = `${SHOPIFY_STORE}/cart/${SHOPIFY_VARIANT_ID}:${qty}`;
+  const params = new URLSearchParams({
+    discount: code,
+    ref: `oxisure-${source}`,
+    utm_source: 'oxisure',
+    utm_medium: source,
+    utm_campaign: 'reorder',
+    utm_content: code.toLowerCase(),
+  });
+  return `${base}?${params.toString()}`;
+}
+
 function computeTimeLeft(createdAt: string, quantity: number) {
   const qty = Math.max(1, quantity);
   const totalSupplyDays = BASE_CYCLE_DAYS * qty;
@@ -74,17 +100,22 @@ serve(async (req) => {
     const { data: profiles, error } = await supabaseAdmin
       .from('profiles')
       .select('*')
-      .not('created_at', 'is', null);
+      .not('created_at', 'is', null)
+      .eq('onboarding_completed', true);
 
     if (error) throw error;
 
     let processedCount = 0;
 
     for (const profile of profiles) {
-      const { swapRawDays, reorderRawDays } = computeTimeLeft(profile.created_at, profile.quantity || 1);
+      const trackerAnchor = profile.tracker_started_at || profile.created_at;
+      const quantity = profile.quantity || 1;
+      const { swapRawDays, reorderRawDays } = computeTimeLeft(trackerAnchor, quantity);
       
       const email = profile.email;
       const pushToken = profile.push_token;
+      const discount = getDiscountForDays(reorderRawDays);
+      const emailCartUrl = buildCartUrl(quantity, reorderRawDays, 'email');
       
       // 1. Swap Reminder (1 Day Before)
       if (swapRawDays === 1) {
@@ -105,13 +136,13 @@ serve(async (req) => {
       }
 
       // 2. Reorder Reminders & Time-Based Discount Logic
-      // Rule: 30 days left -> 10% Off
+      // Rule: 30 days left -> 12% Off (DUESOON12)
       if (reorderRawDays === 30) {
         if (profile.notifications_push && pushToken) {
           await sendPushNotification(
             pushToken, 
             "Supply Running Low ⚠️", 
-            "You only have 30 days of supply left. Reorder now and get 10% off!"
+            `You only have 30 days of supply left. Reorder now and get ${discount.percent}% off with code ${discount.code}!`
           );
         }
         if (profile.notifications_email && email) {
@@ -120,19 +151,19 @@ serve(async (req) => {
             "Action Required: Your supply is running low", 
             `<p>Hi there,</p>
              <p>Your total supply will run out in 30 days. Reorder today to avoid any gaps in your care.</p>
-             <p>Use code <strong>REORDER10</strong> for 10% off your next purchase!</p>
-             <a href="https://oxisuretechsolutions.com/cart">Reorder Now</a>`
+             <p>Use code <strong>${discount.code}</strong> for ${discount.percent}% off your next purchase!</p>
+             <a href="${emailCartUrl}" style="display:inline-block;padding:12px 24px;background:#0284C7;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold;">Reorder Now — ${discount.percent}% Off</a>`
           );
         }
       }
 
-      // Rule: 7 days left -> Urgent 15% Off
+      // Rule: 7 days left -> Urgent 15% Off (RUSH15)
       if (reorderRawDays === 7) {
         if (profile.notifications_push && pushToken) {
           await sendPushNotification(
             pushToken, 
             "Urgent: Reorder Needed 🔴", 
-            "Only 7 days left! Here's an emergency 15% off code: RUSH15."
+            `Only 7 days left! Save ${discount.percent}% with code ${discount.code}.`
           );
         }
         if (profile.notifications_email && email) {
@@ -141,8 +172,8 @@ serve(async (req) => {
             "URGENT: Reorder your oxygen tubing", 
             `<p>Hi there,</p>
              <p>You have only 7 days of supply remaining! We want to make sure you're covered.</p>
-             <p>Use our emergency code <strong>RUSH15</strong> for 15% off!</p>
-             <a href="https://oxisuretechsolutions.com/cart">Claim 15% Off</a>`
+             <p>Use our emergency code <strong>${discount.code}</strong> for ${discount.percent}% off!</p>
+             <a href="${emailCartUrl}" style="display:inline-block;padding:12px 24px;background:#DC2626;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold;">Claim ${discount.percent}% Off Now</a>`
           );
         }
       }

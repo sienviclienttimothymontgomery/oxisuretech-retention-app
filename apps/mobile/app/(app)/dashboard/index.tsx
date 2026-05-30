@@ -1,11 +1,13 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView,
-  ActivityIndicator, Animated, Image, RefreshControl,
+  ActivityIndicator, Animated, Image, RefreshControl, TextInput, Alert, Share,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle } from 'react-native-svg';
 import { Browser } from '@capacitor/browser';
+import { buildCartUrl, getDiscountTier, SHOPIFY_CONFIG } from '@/lib/shopify';
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/providers/AuthProvider';
 import { supabase } from '@/lib/supabase';
@@ -16,10 +18,81 @@ import logoImage from '@/assets/images/logo.png';
 type Profile = {
   user_type: string | null; path_type: string | null; product_sku: string | null;
   quantity: number | null; onboarding_completed: boolean | null;
-  notifications_push: boolean | null; notifications_email: boolean | null; created_at: string | null;
+  notifications_push: boolean | null; notifications_email: boolean | null;
+  created_at: string | null; tracker_started_at: string | null;
 };
 
 const BASE_CYCLE_DAYS = 30;
+
+type Dependent = {
+  id: string; name: string; product_sku: string | null;
+  quantity: number | null; last_replaced_at: string | null;
+  notes: string | null; created_at: string | null;
+};
+
+function getDepStatus(lastReplaced: string | null) {
+  if (!lastReplaced) return { daysLeft: 0, progress: 100, color: '#DC2626', label: 'Replace Now' };
+  const elapsed = Math.max(0, Date.now() - new Date(lastReplaced).getTime());
+  const dLeft = Math.max(0, BASE_CYCLE_DAYS - Math.floor(elapsed / 86400000));
+  const prog = Math.max(0, Math.min(100, ((BASE_CYCLE_DAYS - dLeft) / BASE_CYCLE_DAYS) * 100));
+  const color = dLeft > 7 ? '#16A34A' : dLeft > 0 ? '#D97706' : '#DC2626';
+  const label = dLeft > 7 ? 'On Track' : dLeft > 0 ? 'Due Soon' : 'Replace Now';
+  return { daysLeft: dLeft, progress: prog, color, label };
+}
+
+function sortByUrgency(deps: Dependent[]): Dependent[] {
+  return [...deps].sort((a, b) => getDepStatus(a.last_replaced_at).daysLeft - getDepStatus(b.last_replaced_at).daysLeft);
+}
+
+// ── Conflict Detection & Priority Resolution ──
+type ConflictGroup = {
+  entries: { id: string; name: string; daysLeft: number }[];
+  suggestedBatchDate: string;
+};
+
+function detectScheduleConflicts(deps: Dependent[], windowDays: number = 3): ConflictGroup[] {
+  if (deps.length < 2) return [];
+  const entries = deps.map(d => ({
+    id: d.id, name: d.name,
+    daysLeft: getDepStatus(d.last_replaced_at).daysLeft,
+  })).sort((a, b) => a.daysLeft - b.daysLeft);
+
+  const groups: ConflictGroup[] = [];
+  let current: typeof entries = [entries[0]];
+
+  for (let i = 1; i < entries.length; i++) {
+    if (entries[i].daysLeft - current[current.length - 1].daysLeft <= windowDays) {
+      current.push(entries[i]);
+    } else {
+      if (current.length > 1) {
+        const avg = Math.round(current.reduce((s, e) => s + e.daysLeft, 0) / current.length);
+        const d = new Date(); d.setDate(d.getDate() + avg);
+        groups.push({ entries: [...current], suggestedBatchDate: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) });
+      }
+      current = [entries[i]];
+    }
+  }
+  if (current.length > 1) {
+    const avg = Math.round(current.reduce((s, e) => s + e.daysLeft, 0) / current.length);
+    const d = new Date(); d.setDate(d.getDate() + avg);
+    groups.push({ entries: [...current], suggestedBatchDate: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) });
+  }
+  return groups;
+}
+
+type PriorityLevel = 'critical' | 'high' | 'medium' | 'low';
+function getPriorityLevel(daysLeft: number): PriorityLevel {
+  if (daysLeft <= 0) return 'critical';
+  if (daysLeft <= 3) return 'high';
+  if (daysLeft <= 7) return 'medium';
+  return 'low';
+}
+const PRIORITY_CFG = {
+  critical: { color: '#DC2626', bg: '#FEF2F2', border: '#FECACA', label: 'P0' },
+  high:     { color: '#EA580C', bg: '#FFF7ED', border: '#FED7AA', label: 'P1' },
+  medium:   { color: '#D97706', bg: '#FFFBEB', border: '#FDE68A', label: 'P2' },
+  low:      { color: '#16A34A', bg: '#F0FDF4', border: '#BBF7D0', label: 'P3' },
+};
 
 function computeTimeLeft(createdAt: string | null, quantity: number = 1) {
   const qty = Math.max(1, quantity);
@@ -80,13 +153,25 @@ export default function DashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState<'self' | 'caregiver'>('self');
 
+  // ── Caregiver state ──
+  const [dependents, setDependents] = useState<Dependent[]>([]);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [addingPerson, setAddingPerson] = useState(false);
+  const [replacedId, setReplacedId] = useState<string | null>(null); // for green flash
+  const [newName, setNewName] = useState('');
+  const [newQty, setNewQty] = useState(1);
+  const [cgError, setCgError] = useState<string | null>(null);
+  // Swipe state per card
+  const swipeXRefs = useRef<Record<string, Animated.Value>>({});
+  const touchStartRef = useRef<{ x: number; id: string } | null>(null);
+
   const headerOp = useRef(new Animated.Value(0)).current;
   const ringScale = useRef(new Animated.Value(0.8)).current;
   const ringOp = useRef(new Animated.Value(0)).current;
   const cardsY = useRef(new Animated.Value(30)).current;
   const cardsOp = useRef(new Animated.Value(0)).current;
 
-  const timeLeft = computeTimeLeft(profile?.created_at ?? null, profile?.quantity ?? 1);
+  const timeLeft = computeTimeLeft(profile?.tracker_started_at ?? profile?.created_at ?? null, profile?.quantity ?? 1);
   const status = getStatusConfig(timeLeft.swapRawDays);
   const progress = Math.max(0, Math.min(1, timeLeft.swapRawDays / BASE_CYCLE_DAYS));
   const nextDate = (() => { const d = new Date(); d.setDate(d.getDate() + timeLeft.swapRawDays); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); })();
@@ -95,8 +180,25 @@ export default function DashboardScreen() {
   const ringSize = 200, sw = 14, r = (ringSize - sw) / 2;
   const circ = 2 * Math.PI * r, dashOff = circ * (1 - progress);
 
+  // Caregiver computed values
+  const sortedDeps = sortByUrgency(dependents);
+  const needsAttention = dependents.filter(d => getDepStatus(d.last_replaced_at).daysLeft <= 7).length;
+  const urgentDeps = dependents.filter(d => getDepStatus(d.last_replaced_at).daysLeft <= 3);
+  const lowSupplyCount = dependents.filter(d => getDepStatus(d.last_replaced_at).daysLeft <= 14).length;
+  const conflicts = detectScheduleConflicts(dependents);
+
+  const reorderTier = getDiscountTier(timeLeft.reorderRawDays);
+
   const handleReorder = async () => {
-    try { await Browser.open({ url: 'https://oxisuretechsolutions.com/products/oxygen-tubing-50-ft-non-kinking-high-flow-hose' }); } catch (e) { console.error(e); }
+    const cartUrl = buildCartUrl(profile?.quantity ?? 1, timeLeft.reorderRawDays, 'mobile');
+    try { await Browser.open({ url: cartUrl }); } catch (e) { console.error(e); }
+  };
+
+  const handleBulkReorder = async () => {
+    if (dependents.length === 0) return;
+    const lowestDays = Math.min(...dependents.map(d => getDepStatus(d.last_replaced_at).daysLeft));
+    const cartUrl = buildCartUrl(lowSupplyCount, lowestDays, 'mobile');
+    try { await Browser.open({ url: cartUrl }); } catch (e) { console.error(e); }
   };
 
   const fetchProfile = useCallback(async () => {
@@ -111,10 +213,22 @@ export default function DashboardScreen() {
     }
   }, [user]);
 
+  const fetchDependents = useCallback(async () => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase.from('dependents').select('*').eq('caregiver_id', user.id).order('created_at', { ascending: true });
+      if (error) throw error;
+      setDependents((data as Dependent[]) || []);
+    } catch (e: any) {
+      console.error('Failed to load dependents', e);
+    }
+  }, [user]);
+
   useEffect(() => {
     if (!user) return;
     (async () => {
       await fetchProfile();
+      await fetchDependents();
       setLoading(false);
       Animated.stagger(150, [
         Animated.timing(headerOp, { toValue: 1, duration: 400, useNativeDriver: true }),
@@ -128,13 +242,109 @@ export default function DashboardScreen() {
         ]),
       ]).start();
     })();
-  }, [user, fetchProfile]);
+  }, [user, fetchProfile, fetchDependents]);
+
+  // Real-time subscription for dependents
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase.channel('dependents-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'dependents', filter: `caregiver_id=eq.${user.id}` },
+        () => { fetchDependents(); }
+      ).subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user, fetchDependents]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchProfile();
+    await Promise.all([fetchProfile(), fetchDependents()]);
     setRefreshing(false);
-  }, [fetchProfile]);
+  }, [fetchProfile, fetchDependents]);
+
+  // ── Caregiver CRUD ──
+  const handleMarkReplaced = useCallback(async (depId: string) => {
+    const now = new Date().toISOString();
+    // Optimistic update
+    setDependents(prev => prev.map(d => d.id === depId ? { ...d, last_replaced_at: now } : d));
+    setReplacedId(depId);
+    try { await Haptics.impact({ style: ImpactStyle.Light }); } catch {}
+    setTimeout(() => setReplacedId(null), 1500);
+
+    const { error } = await supabase.from('dependents').update({ last_replaced_at: now }).eq('id', depId);
+    if (error) {
+      // Rollback
+      setCgError('Failed to update — please try again');
+      setTimeout(() => setCgError(null), 3000);
+      await fetchDependents();
+    }
+  }, [fetchDependents]);
+
+  const handleDeleteDependent = useCallback((dep: Dependent) => {
+    Alert.alert('Remove Person', `Remove ${dep.name} from your care list? This cannot be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: async () => {
+        setDependents(prev => prev.filter(d => d.id !== dep.id));
+        const { error } = await supabase.from('dependents').delete().eq('id', dep.id);
+        if (error) {
+          setCgError('Failed to remove — please try again');
+          setTimeout(() => setCgError(null), 3000);
+          await fetchDependents();
+        }
+      }},
+    ]);
+  }, [fetchDependents]);
+
+  const handleAddPerson = useCallback(async () => {
+    if (!user || !newName.trim()) return;
+    setAddingPerson(true); setCgError(null);
+    const { error } = await supabase.from('dependents').insert({
+      caregiver_id: user.id, name: newName.trim(), product_sku: 'OXI-TUB-07',
+      quantity: newQty, last_replaced_at: new Date().toISOString(),
+    });
+    setAddingPerson(false);
+    if (error) {
+      setCgError('Failed to add person — please try again');
+      setTimeout(() => setCgError(null), 3000);
+    } else {
+      setNewName(''); setNewQty(1); setShowAddForm(false);
+      await fetchDependents();
+      try { await Haptics.impact({ style: ImpactStyle.Medium }); } catch {}
+    }
+  }, [user, newName, newQty, fetchDependents]);
+
+  const handleShareSummary = useCallback(async () => {
+    const lines = sortedDeps.map(d => {
+      const ds = getDepStatus(d.last_replaced_at);
+      const next = new Date(); next.setDate(next.getDate() + ds.daysLeft);
+      return `• ${d.name} — ${ds.label} (${ds.daysLeft} days left, next due ${next.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`;
+    });
+    const msg = `OxiSure Caregiver Summary\n${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}\n\n${lines.join('\n')}\n\nManaging ${dependents.length} ${dependents.length === 1 ? 'person' : 'people'}`;
+    try { await Share.share({ message: msg }); } catch {}
+  }, [sortedDeps, dependents.length]);
+
+  // Swipe helpers
+  const getSwipeX = (id: string) => {
+    if (!swipeXRefs.current[id]) swipeXRefs.current[id] = new Animated.Value(0);
+    return swipeXRefs.current[id];
+  };
+  const onSwipeStart = (id: string, pageX: number) => { touchStartRef.current = { x: pageX, id }; };
+  const onSwipeMove = (id: string, pageX: number) => {
+    if (!touchStartRef.current || touchStartRef.current.id !== id) return;
+    const dx = Math.min(0, Math.max(-80, pageX - touchStartRef.current.x));
+    getSwipeX(id).setValue(dx);
+  };
+  const onSwipeEnd = (id: string) => {
+    if (!touchStartRef.current || touchStartRef.current.id !== id) return;
+    const val = (getSwipeX(id) as any).__getValue?.() ?? 0;
+    if (val < -40) {
+      Animated.spring(getSwipeX(id), { toValue: -80, tension: 50, friction: 10, useNativeDriver: true }).start();
+    } else {
+      Animated.spring(getSwipeX(id), { toValue: 0, tension: 50, friction: 10, useNativeDriver: true }).start();
+    }
+    touchStartRef.current = null;
+  };
+  const resetSwipe = (id: string) => {
+    Animated.spring(getSwipeX(id), { toValue: 0, tension: 50, friction: 10, useNativeDriver: true }).start();
+  };
 
   if (loading) return (
     <View style={s.loader}><View style={[StyleSheet.absoluteFill, { backgroundColor: colors.bg }]} />
@@ -231,9 +441,9 @@ export default function DashboardScreen() {
                 <TouchableOpacity style={s.reorderCard} activeOpacity={0.85} onPress={handleReorder}>
                   <LinearGradient colors={['#0EA5E9', '#0284C7', '#0369A1']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.reorderGrad}>
                     <View style={s.reorderContent}>
-                      <View style={s.reorderBadge}><Text style={s.reorderBadgeText}>🎉 SAVE 10%</Text></View>
+                      <View style={s.reorderBadge}><Text style={s.reorderBadgeText}>🎉 SAVE {reorderTier.percent}%</Text></View>
                       <Text style={s.reorderTitle}>Ready to Reorder?</Text>
-                      <Text style={s.reorderSub}>Your total supply is running low. Get your replacement supplies with an early reorder discount</Text>
+                      <Text style={s.reorderSub}>{reorderTier.message}</Text>
                       <View style={s.reorderButton}><Text style={s.reorderButtonText}>Order Now →</Text></View>
                     </View>
                   </LinearGradient>
@@ -286,15 +496,198 @@ export default function DashboardScreen() {
             </Animated.View>
           </>) : (
             <Animated.View style={[s.caregiverView, { opacity: cardsOp, transform: [{ translateY: cardsY }] }]}>
-              {/* Coming Soon Notice */}
-              <View style={s.comingSoonCard}>
-                <Text style={{ fontSize: 48, marginBottom: Spacing.md }}>👥</Text>
-                <Text style={s.comingSoonTitle}>Caregiver Management</Text>
-                <Text style={s.comingSoonDesc}>Manage replacement schedules for your loved ones — all in one place. This feature is coming soon!</Text>
-                <View style={s.comingSoonBadge}>
-                  <Text style={s.comingSoonBadgeText}>🚀 Coming Soon</Text>
+              {/* Caregiver Greeting */}
+              <View style={s.cgGreeting}>
+                <Text style={s.cgGreetTitle}>❤️ Managing {dependents.length} {dependents.length === 1 ? 'person' : 'people'}</Text>
+                {dependents.length > 0 && (
+                  <TouchableOpacity onPress={handleShareSummary} activeOpacity={0.7} style={s.shareBtn}>
+                    <Text style={s.shareBtnText}>📋 Share Summary</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Error Toast */}
+              {cgError && <View style={s.cgErrorBanner}><Text style={s.cgErrorText}>⚠️ {cgError}</Text></View>}
+
+              {/* Urgent Alert Banner */}
+              {urgentDeps.length > 0 && (
+                <View style={s.urgentBanner}>
+                  <Text style={{ fontSize: 20 }}>🚨</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.urgentTitle}>Immediate attention needed</Text>
+                    <Text style={s.urgentNames}>{urgentDeps.map(d => d.name).join(', ')} — tubing overdue or due within 3 days</Text>
+                  </View>
+                </View>
+              )}
+
+              {/* Conflict Detection */}
+              {conflicts.length > 0 && (
+                <View style={s.conflictCard}>
+                  <View style={s.conflictHeader}>
+                    <Text style={{ fontSize: 18 }}>⚡</Text>
+                    <Text style={s.conflictTitle}>Scheduling Overlaps</Text>
+                  </View>
+                  {conflicts.map((group, idx) => (
+                    <View key={idx} style={s.conflictGroup}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.conflictNames}>{group.entries.map(e => e.name).join(' & ')}</Text>
+                        <Text style={s.conflictDue}>Due within {Math.abs(group.entries[group.entries.length - 1].daysLeft - group.entries[0].daysLeft)} days of each other</Text>
+                      </View>
+                      <View style={s.conflictBatch}>
+                        <Text style={s.conflictBatchLabel}>Batch on</Text>
+                        <Text style={s.conflictBatchDate}>{group.suggestedBatchDate}</Text>
+                      </View>
+                    </View>
+                  ))}
+                  <Text style={s.conflictHint}>💡 Replace these together to simplify your schedule</Text>
+                </View>
+              )}
+
+              {/* Stats Row */}
+              <View style={s.cgStats}>
+                <View style={s.cgStatCard}>
+                  <Text style={{ fontSize: 18 }}>👥</Text>
+                  <Text style={s.cgStatValue}>{dependents.length}</Text>
+                  <Text style={s.cgStatLabel}>People</Text>
+                </View>
+                <View style={s.cgStatCard}>
+                  <Text style={{ fontSize: 18 }}>✅</Text>
+                  <Text style={[s.cgStatValue, { color: '#16A34A' }]}>{dependents.length - needsAttention}</Text>
+                  <Text style={s.cgStatLabel}>On Track</Text>
+                </View>
+                <View style={[s.cgStatCard, needsAttention > 0 && { borderColor: '#FDE68A' }]}>
+                  <Text style={{ fontSize: 18 }}>⚠️</Text>
+                  <Text style={[s.cgStatValue, needsAttention > 0 && { color: '#D97706' }]}>{needsAttention}</Text>
+                  <Text style={s.cgStatLabel}>Attention</Text>
                 </View>
               </View>
+
+              {lowSupplyCount > 0 && (
+                <TouchableOpacity style={s.bulkReorderCard} activeOpacity={0.85} onPress={handleBulkReorder}>
+                  <LinearGradient colors={['#0EA5E9', '#0284C7']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.bulkReorderGrad}>
+                    <Text style={{ fontSize: 18 }}>📦</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.bulkReorderTitle}>{lowSupplyCount} {lowSupplyCount === 1 ? 'person needs' : 'people need'} supplies soon</Text>
+                      <Text style={s.bulkReorderSub}>Order replacement tubing for everyone →</Text>
+                    </View>
+                  </LinearGradient>
+                </TouchableOpacity>
+              )}
+
+              {/* Dependent Cards */}
+              {sortedDeps.length > 0 ? sortedDeps.map(dep => {
+                const ds = getDepStatus(dep.last_replaced_at);
+                const nextSwap = new Date(); nextSwap.setDate(nextSwap.getDate() + ds.daysLeft);
+                const isReplaced = replacedId === dep.id;
+                const miniR = 20, miniSw = 3.5, miniCirc = 2 * Math.PI * miniR;
+                const miniOff = miniCirc * (ds.progress / 100);
+
+                return (
+                  <View key={dep.id} style={s.swipeContainer}>
+                    {/* Delete behind layer */}
+                    <View style={s.swipeDeleteBg}>
+                      <TouchableOpacity style={s.swipeDeleteBtn} onPress={() => { resetSwipe(dep.id); handleDeleteDependent(dep); }} activeOpacity={0.7}>
+                        <Text style={s.swipeDeleteText}>🗑️ Remove</Text>
+                      </TouchableOpacity>
+                    </View>
+                    {/* Card front */}
+                    <Animated.View
+                      style={[s.dependentCard, isReplaced && s.depCardFlash, { transform: [{ translateX: getSwipeX(dep.id) }] }]}
+                      onTouchStart={(e: any) => onSwipeStart(dep.id, e.nativeEvent.pageX)}
+                      onTouchMove={(e: any) => onSwipeMove(dep.id, e.nativeEvent.pageX)}
+                      onTouchEnd={() => onSwipeEnd(dep.id)}
+                    >
+                      {/* Mini ring */}
+                      <View style={s.depRingContainer}>
+                        <Svg width={48} height={48} style={s.depRingSvg}>
+                          <Circle cx={24} cy={24} r={miniR} stroke="#E2E8F0" strokeWidth={miniSw} fill="transparent" />
+                          <Circle cx={24} cy={24} r={miniR} stroke={ds.color} strokeWidth={miniSw} fill="transparent"
+                            strokeDasharray={`${miniCirc}`} strokeDashoffset={miniOff} strokeLinecap="round" rotation="-90" origin="24, 24" />
+                        </Svg>
+                        <View style={s.depAvatarInner}>
+                          <Text style={[s.depDaysText, { color: ds.color }]}>{ds.daysLeft}</Text>
+                        </View>
+                      </View>
+                      {/* Info */}
+                      <View style={s.depInfo}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                          <Text style={s.depName} numberOfLines={1}>{dep.name}</Text>
+                          <View style={[s.depRoleBadge, { backgroundColor: ds.color + '18', borderColor: ds.color + '30' }]}>
+                            <Text style={[s.depRoleText, { color: ds.color }]}>{ds.label}</Text>
+                          </View>
+                          <View style={[s.priorityBadge, { backgroundColor: PRIORITY_CFG[getPriorityLevel(ds.daysLeft)].bg, borderColor: PRIORITY_CFG[getPriorityLevel(ds.daysLeft)].border }]}>
+                            <Text style={[s.priorityBadgeText, { color: PRIORITY_CFG[getPriorityLevel(ds.daysLeft)].color }]}>{PRIORITY_CFG[getPriorityLevel(ds.daysLeft)].label}</Text>
+                          </View>
+                          {dep.notes && dep.notes.trim() !== '' && <Text style={{ fontSize: 12 }}>📝</Text>}
+                        </View>
+                        <Text style={s.depProduct} numberOfLines={1}>
+                          {dep.product_sku || 'Standard Tubing'} · Qty: {dep.quantity || 1} · Next: {nextSwap.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        </Text>
+                        {dep.last_replaced_at && (
+                          <Text style={{ fontSize: 11, fontFamily: 'Inter', color: '#CBD5E1', marginTop: 1 }}>
+                            Last replaced {new Date(dep.last_replaced_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          </Text>
+                        )}
+                      </View>
+                      {/* Replace button */}
+                      <TouchableOpacity
+                        style={[s.depReplaceBtn, isReplaced && s.depReplaceBtnDone]}
+                        onPress={() => handleMarkReplaced(dep.id)} activeOpacity={0.7}
+                      >
+                        <Text style={[s.depReplaceBtnText, isReplaced && { color: '#FFF' }]}>
+                          {isReplaced ? '✓' : '🔄'}
+                        </Text>
+                      </TouchableOpacity>
+                    </Animated.View>
+                  </View>
+                );
+              }) : (
+                /* Empty State */
+                <View style={s.cgEmptyCard}>
+                  <Text style={{ fontSize: 48, marginBottom: Spacing.md }}>👥</Text>
+                  <Text style={s.cgEmptyTitle}>No people added yet</Text>
+                  <Text style={s.cgEmptyDesc}>Add family members or patients to start tracking their tubing replacement schedules.</Text>
+                </View>
+              )}
+
+              {/* Add Person */}
+              {showAddForm ? (
+                <View style={s.addFormCard}>
+                  <Text style={s.addFormTitle}>Add a Person</Text>
+                  <View style={{ gap: Spacing.md }}>
+                    <View>
+                      <Text style={s.addFormLabel}>Name *</Text>
+                      <TextInput style={s.addFormInput} placeholder="e.g. Mom, John" placeholderTextColor="#CBD5E1" value={newName} onChangeText={setNewName} />
+                    </View>
+                    <View>
+                      <Text style={s.addFormLabel}>Tubes per cycle</Text>
+                      <View style={s.addFormStepperRow}>
+                        <TouchableOpacity style={s.addFormStepperBtn} onPress={() => setNewQty(Math.max(1, newQty - 1))}><Text style={s.addFormStepperIcon}>−</Text></TouchableOpacity>
+                        <Text style={s.addFormQtyText}>{newQty}</Text>
+                        <TouchableOpacity style={[s.addFormStepperBtn, { backgroundColor: '#0EA5E9', borderColor: '#0EA5E9' }]} onPress={() => setNewQty(Math.min(12, newQty + 1))}><Text style={[s.addFormStepperIcon, { color: '#FFF' }]}>+</Text></TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                  <View style={s.addFormActions}>
+                    <TouchableOpacity style={s.addFormCancelBtn} onPress={() => { setShowAddForm(false); setNewName(''); setNewQty(1); }} activeOpacity={0.7}>
+                      <Text style={s.addFormCancelText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[s.addFormSubmitBtn, { opacity: addingPerson || !newName.trim() ? 0.5 : 1 }]} onPress={handleAddPerson} disabled={addingPerson || !newName.trim()} activeOpacity={0.85}>
+                      <LinearGradient colors={['#38BDF8', '#0EA5E9']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.addFormSubmitGrad}>
+                        {addingPerson ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={s.addFormSubmitText}>➕ Add Person</Text>}
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                <TouchableOpacity style={s.addPersonCard} onPress={() => setShowAddForm(true)} activeOpacity={0.7}>
+                  <View style={s.addPersonIcon}><Text style={{ fontSize: 20 }}>➕</Text></View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.addPersonTitle}>Add a Person</Text>
+                    <Text style={s.addPersonSub}>Track tubing for someone you care for</Text>
+                  </View>
+                </TouchableOpacity>
+              )}
             </Animated.View>
           )}
         </ScrollView>
@@ -396,9 +789,65 @@ const s = StyleSheet.create({
   retryBtn: { paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm + 2, borderRadius: Radii.sm, backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA' },
   retryText: { fontSize: 14, fontWeight: '600', fontFamily: 'Inter', color: '#DC2626' },
 
-  comingSoonCard: { alignItems: 'center', paddingVertical: Spacing.xxl, paddingHorizontal: Spacing.lg, backgroundColor: '#FFF', borderRadius: Radii.xl, borderWidth: 1, borderColor: '#E2E8F0', ...Shadows.md },
-  comingSoonTitle: { fontSize: 20, fontWeight: '800', fontFamily: 'Inter', color: '#1A1A2E', marginBottom: Spacing.sm },
-  comingSoonDesc: { fontSize: 15, fontFamily: 'Inter', color: '#64748B', textAlign: 'center', lineHeight: 22, marginBottom: Spacing.lg },
-  comingSoonBadge: { backgroundColor: '#F0F9FF', paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm, borderRadius: Radii.full, borderWidth: 1, borderColor: '#BAE6FD' },
-  comingSoonBadgeText: { fontSize: 14, fontWeight: '700', fontFamily: 'Inter', color: '#0C5A8A' },
+  cgGreeting: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm },
+  cgGreetTitle: { fontSize: 17, fontWeight: '800', fontFamily: 'Inter', color: '#1A1A2E' },
+  shareBtn: { paddingHorizontal: Spacing.md, paddingVertical: 6, borderRadius: Radii.full, backgroundColor: '#F0F9FF', borderWidth: 1, borderColor: '#BAE6FD' },
+  shareBtnText: { fontSize: 12, fontWeight: '600', fontFamily: 'Inter', color: '#0C5A8A' },
+
+  cgErrorBanner: { backgroundColor: '#FEF2F2', borderRadius: Radii.lg, padding: Spacing.md, borderWidth: 1, borderColor: '#FECACA', marginBottom: Spacing.sm },
+  cgErrorText: { fontSize: 13, fontWeight: '500', fontFamily: 'Inter', color: '#DC2626' },
+
+  urgentBanner: { flexDirection: 'row', gap: Spacing.md, alignItems: 'flex-start', backgroundColor: '#FEF2F2', borderRadius: Radii.lg, padding: Spacing.md, borderWidth: 1, borderColor: '#FECACA', marginBottom: Spacing.sm },
+  urgentTitle: { fontSize: 14, fontWeight: '700', fontFamily: 'Inter', color: '#DC2626', marginBottom: 2 },
+  urgentNames: { fontSize: 13, fontFamily: 'Inter', color: '#B91C1C', lineHeight: 18 },
+
+  bulkReorderCard: { borderRadius: Radii.lg, overflow: 'hidden', marginBottom: Spacing.sm, ...Shadows.md },
+  bulkReorderGrad: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, padding: Spacing.md, borderRadius: Radii.lg },
+  bulkReorderTitle: { fontSize: 14, fontWeight: '700', fontFamily: 'Inter', color: '#FFF' },
+  bulkReorderSub: { fontSize: 12, fontFamily: 'Inter', color: 'rgba(255,255,255,0.85)', marginTop: 1 },
+
+  swipeContainer: { position: 'relative', overflow: 'hidden', borderRadius: Radii.xl, marginBottom: 0 },
+  swipeDeleteBg: { position: 'absolute', top: 0, bottom: 0, right: 0, width: 80, backgroundColor: '#DC2626', borderTopRightRadius: Radii.xl, borderBottomRightRadius: Radii.xl, justifyContent: 'center', alignItems: 'center' },
+  swipeDeleteBtn: { flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%' },
+  swipeDeleteText: { fontSize: 11, fontWeight: '700', fontFamily: 'Inter', color: '#FFF' },
+
+  depCardFlash: { backgroundColor: '#F0FDF4', borderColor: '#86EFAC' },
+  depReplaceBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#F0F9FF', borderWidth: 1, borderColor: '#BAE6FD', justifyContent: 'center', alignItems: 'center', marginLeft: Spacing.sm },
+  depReplaceBtnDone: { backgroundColor: '#16A34A', borderColor: '#16A34A' },
+  depReplaceBtnText: { fontSize: 16 },
+
+  cgEmptyCard: { alignItems: 'center', paddingVertical: Spacing.xxl, paddingHorizontal: Spacing.lg, backgroundColor: '#FFF', borderRadius: Radii.xl, borderWidth: 1, borderColor: '#E2E8F0', ...Shadows.sm },
+  cgEmptyTitle: { fontSize: 18, fontWeight: '800', fontFamily: 'Inter', color: '#1A1A2E', marginBottom: Spacing.xs },
+  cgEmptyDesc: { fontSize: 14, fontFamily: 'Inter', color: '#94A3B8', textAlign: 'center', lineHeight: 20, maxWidth: 280 },
+
+  addFormCard: { backgroundColor: '#FFF', borderRadius: Radii.xl, borderWidth: 1, borderColor: '#E2E8F0', padding: Spacing.lg, marginTop: Spacing.sm, ...Shadows.md },
+  addFormTitle: { fontSize: 16, fontWeight: '700', fontFamily: 'Inter', color: '#1A1A2E', marginBottom: Spacing.lg },
+  addFormLabel: { fontSize: 12, fontWeight: '700', fontFamily: 'Inter', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: Spacing.sm },
+  addFormInput: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: Radii.lg, paddingHorizontal: Spacing.md, paddingVertical: 12, fontSize: 15, fontFamily: 'Inter', color: '#1A1A2E' },
+  addFormStepperRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.lg },
+  addFormStepperBtn: { width: 40, height: 40, borderRadius: 20, borderWidth: 1.5, borderColor: '#CBD5E1', backgroundColor: '#F8FAFC', justifyContent: 'center', alignItems: 'center' },
+  addFormStepperIcon: { fontSize: 20, fontWeight: '600', color: '#1A1A2E' },
+  addFormQtyText: { fontSize: 28, fontWeight: '800', fontFamily: 'Inter', color: '#0C5A8A', minWidth: 40, textAlign: 'center' },
+  addFormActions: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.lg },
+  addFormCancelBtn: { flex: 1, paddingVertical: 14, borderRadius: Radii.md, borderWidth: 1, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC', alignItems: 'center' },
+  addFormCancelText: { fontSize: 14, fontWeight: '600', fontFamily: 'Inter', color: '#64748B' },
+  addFormSubmitBtn: { flex: 2, borderRadius: Radii.md, overflow: 'hidden' },
+  addFormSubmitGrad: { paddingVertical: 14, alignItems: 'center', justifyContent: 'center', borderRadius: Radii.md },
+  addFormSubmitText: { fontSize: 14, fontWeight: '700', fontFamily: 'Inter', color: '#FFF' },
+
+  // Conflict Detection styles
+  conflictCard: { backgroundColor: '#FEFCE8', borderRadius: Radii.lg, padding: Spacing.md, borderWidth: 1, borderColor: '#FDE68A', marginBottom: Spacing.sm },
+  conflictHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.sm },
+  conflictTitle: { fontSize: 14, fontWeight: '700', fontFamily: 'Inter', color: '#92400E' },
+  conflictGroup: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF', borderRadius: Radii.md, padding: Spacing.sm + 2, marginBottom: Spacing.xs, borderWidth: 1, borderColor: '#FDE68A' },
+  conflictNames: { fontSize: 13, fontWeight: '600', fontFamily: 'Inter', color: '#78350F' },
+  conflictDue: { fontSize: 11, fontFamily: 'Inter', color: '#A16207', marginTop: 1 },
+  conflictBatch: { alignItems: 'center', marginLeft: Spacing.sm, backgroundColor: '#FEF3C7', borderRadius: Radii.sm, paddingHorizontal: Spacing.sm, paddingVertical: 4 },
+  conflictBatchLabel: { fontSize: 9, fontWeight: '600', fontFamily: 'Inter', color: '#A16207', textTransform: 'uppercase', letterSpacing: 0.5 },
+  conflictBatchDate: { fontSize: 12, fontWeight: '700', fontFamily: 'Inter', color: '#78350F' },
+  conflictHint: { fontSize: 11, fontFamily: 'Inter', color: '#A16207', marginTop: Spacing.xs },
+
+  // Priority badge styles
+  priorityBadge: { paddingHorizontal: 5, paddingVertical: 1, borderRadius: 3, borderWidth: 1 },
+  priorityBadgeText: { fontSize: 9, fontWeight: '800', fontFamily: 'Inter', letterSpacing: 0.3 },
 });
