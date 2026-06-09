@@ -27,7 +27,7 @@ export default function LoginForm({ type, redirectTo }: { type: 'app' | 'web'; r
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=${destination}`,
+        redirectTo: `${window.location.origin}/auth/callback?next=${destination}&cb=${Date.now()}`,
         ...(provider === 'google' && {
           queryParams: {
             prompt: 'consent',
@@ -52,7 +52,7 @@ export default function LoginForm({ type, redirectTo }: { type: 'app' | 'web'; r
         const { error, data } = await supabase.functions.invoke('send-magic-link', {
           body: { 
             email, 
-            redirectTo: `${window.location.origin}/auth/verify-hash?next=/web/dashboard` 
+            redirectTo: `${window.location.origin}/auth/verify-hash?next=/web/dashboard&cb=${Date.now()}` 
           }
         })
         if (error) throw error
@@ -67,7 +67,7 @@ export default function LoginForm({ type, redirectTo }: { type: 'app' | 'web'; r
         const { error: otpError } = await supabase.auth.signInWithOtp({
           email,
           options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback?next=/web/dashboard`,
+            emailRedirectTo: `${window.location.origin}/auth/callback?next=/web/dashboard&cb=${Date.now()}`,
           },
         })
         if (otpError) {
@@ -129,7 +129,7 @@ export default function LoginForm({ type, redirectTo }: { type: 'app' | 'web'; r
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback?next=${destination}`,
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=${destination}&cb=${Date.now()}`,
           data: {
             full_name: fullName.trim(),
           }
@@ -161,7 +161,7 @@ export default function LoginForm({ type, redirectTo }: { type: 'app' | 'web'; r
     setLoading(true)
     setError(null)
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/callback?next=${destination}`,
+      redirectTo: `${window.location.origin}/auth/callback?next=${destination}&cb=${Date.now()}`,
     })
     if (error) setError(error.message)
     else setMessage('Password reset link sent to your email.')
