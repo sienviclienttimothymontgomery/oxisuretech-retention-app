@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import Button from '@/components/ui/Button'
 import InputField from '@/components/ui/InputField'
+import { logEvent } from '@/utils/analytics'
 
 export default function LoginForm({ type, redirectTo }: { type: 'app' | 'web'; redirectTo?: string }) {
   const [email, setEmail] = useState('')
@@ -27,6 +28,11 @@ export default function LoginForm({ type, redirectTo }: { type: 'app' | 'web'; r
       provider,
       options: {
         redirectTo: `${window.location.origin}/auth/callback?next=${destination}`,
+        ...(provider === 'google' && {
+          queryParams: {
+            prompt: 'consent',
+          },
+        }),
       },
     })
     if (error) setError(error.message)
@@ -83,6 +89,8 @@ export default function LoginForm({ type, redirectTo }: { type: 'app' | 'web'; r
         if (error) {
           setError(error.message)
         } else if (data?.session) {
+          // Log login event
+          await logEvent('login', data.session.user.id);
           // Session is confirmed from the sign-in response itself — no need for a separate getSession() call
           // which can be unreliable with @supabase/ssr due to cookie timing issues.
           // Small delay to ensure cookies are flushed to the browser cookie jar
@@ -132,6 +140,9 @@ export default function LoginForm({ type, redirectTo }: { type: 'app' | 'web'; r
       } else if (data?.user?.identities?.length === 0) {
         setError('An account with this email already exists. Try signing in instead.')
       } else {
+        if (data?.user) {
+          await logEvent('install', data.user.id);
+        }
         setMessage('Account created! Check your email to confirm, then sign in.')
       }
     } catch (err: any) {

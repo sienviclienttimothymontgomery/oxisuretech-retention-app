@@ -44,6 +44,12 @@ function CallbackContent() {
         const code = searchParams.get("code");
 
         if (code) {
+          console.log("[Auth Callback] Initiating PKCE exchange with details:", {
+            code: code.substring(0, 10) + "...",
+            documentCookies: typeof document !== "undefined" ? document.cookie : "N/A",
+            sessionStorageVerifier: typeof window !== "undefined" ? window.sessionStorage.getItem("__session-code-verifier") : "N/A",
+            localStorageVerifier: typeof window !== "undefined" ? window.localStorage.getItem("__session-code-verifier") : "N/A",
+          });
           if (isMounted) setStatus("Exchanging authorization code...");
 
           const { data, error } = await supabase.auth.exchangeCodeForSession(code);

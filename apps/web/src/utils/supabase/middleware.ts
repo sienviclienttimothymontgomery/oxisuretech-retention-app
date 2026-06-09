@@ -1,6 +1,21 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+function getRedirectUrl(request: NextRequest, pathname: string) {
+  const url = request.nextUrl.clone()
+  url.pathname = pathname
+  
+  const forwardedHost = request.headers.get('x-forwarded-host')
+  if (forwardedHost) {
+    url.host = forwardedHost
+    const forwardedProto = request.headers.get('x-forwarded-proto')
+    if (forwardedProto) {
+      url.protocol = forwardedProto.endsWith(':') ? forwardedProto : `${forwardedProto}:`
+    }
+  }
+  return url
+}
+
 export async function updateSession(request: NextRequest) {
   const isPrefetch = request.headers.get('x-middleware-prefetch') === '1'
   const path = request.nextUrl.pathname
@@ -66,8 +81,7 @@ export async function updateSession(request: NextRequest) {
     const errorDesc = request.nextUrl.searchParams.get('error_description');
     
     if (errorCode === 'otp_expired' || errorDesc?.includes('invalid')) {
-      const url = request.nextUrl.clone();
-      url.pathname = '/auth/auth-code-error';
+      const url = getRedirectUrl(request, '/auth/auth-code-error')
       url.search = ''; // Clear search params
       return NextResponse.redirect(url);
     }
@@ -90,15 +104,13 @@ export async function updateSession(request: NextRequest) {
 
   if (!user && (isAppDashboard || isAppOnboarding)) {
     // protect app routes
-    const url = request.nextUrl.clone()
-    url.pathname = '/app/login'
+    const url = getRedirectUrl(request, '/app/login')
     return NextResponse.redirect(url)
   }
 
   if (!user && (isWebDashboard || isWebAdmin || isWebOnboarding)) {
     // protect web routes
-    const url = request.nextUrl.clone()
-    url.pathname = '/web/start'
+    const url = getRedirectUrl(request, '/web/start')
     return NextResponse.redirect(url)
   }
 
@@ -113,24 +125,23 @@ export async function updateSession(request: NextRequest) {
     const isAdminEmail = user.email === 'admin@oxisuretech.com'
     if (isAdminEmail) {
       console.log(`[Middleware] 👑 Admin user detected, redirecting from ${path} to /web/admin`)
-      const url = request.nextUrl.clone()
-      url.pathname = '/web/admin'
+      const url = getRedirectUrl(request, '/web/admin')
       return NextResponse.redirect(url)
     }
   }
 
   // Root redirection for authenticated (non-admin) users trying to access starter pages
   if (user && isStarterRoute) {
-    const url = request.nextUrl.clone()
+    let redirectPath = '/app/dashboard'
     // Route based on which starter page they're on, not profile path_type
     // This allows mobile-registered users to also access the web dashboard
     if (isWebStart || isWebEmail) {
       console.log(`[Middleware] 🔄 Authenticated user on ${path}, redirecting to /web/dashboard`)
-      url.pathname = '/web/dashboard'
+      redirectPath = '/web/dashboard'
     } else {
       console.log(`[Middleware] 🔄 Authenticated user on ${path}, redirecting to /app/dashboard`)
-      url.pathname = '/app/dashboard'
     }
+    const url = getRedirectUrl(request, redirectPath)
     return NextResponse.redirect(url)
   }
 

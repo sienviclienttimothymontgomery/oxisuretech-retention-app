@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
+import { logServerEvent } from '@/utils/analytics-server'
 
 export async function submitUserType(formData: FormData) {
   const userType = formData.get('userType') as string
@@ -99,6 +100,9 @@ export async function submitWebOnboarding(formData: FormData) {
     redirect(`/web/onboarding?error=${encodeURIComponent(error.message)}`)
   }
 
+  // Log activation event
+  await logServerEvent('activation', user.id);
+
   revalidatePath('/web/dashboard')
   redirect('/web/dashboard')
 }
@@ -112,6 +116,9 @@ export async function completeOnboarding() {
     .from('profiles')
     .update({ onboarding_completed: true, tracker_started_at: new Date().toISOString() })
     .eq('id', user.id)
+
+  // Log activation event
+  await logServerEvent('activation', user.id);
     
   revalidatePath('/app/dashboard')
   redirect('/app/dashboard')

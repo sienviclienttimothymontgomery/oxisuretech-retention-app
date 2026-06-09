@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { Loader2 } from "lucide-react";
 import Image from "next/image";
+import { logEvent } from "@/utils/analytics";
 
 function VerifyHashContent() {
   const router = useRouter();
@@ -57,6 +58,7 @@ function VerifyHashContent() {
 
           if (data.session) {
             if (isMounted) setStatus("Verification successful! Redirecting...");
+            await logEvent("login", data.session.user.id);
             const next = searchParams.get('next') || '/web/dashboard';
             setTimeout(() => {
               if (isMounted) window.location.href = next;
@@ -87,12 +89,14 @@ function VerifyHashContent() {
           }
         }, 10000);
 
-        const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+        const { data: authListener } = supabase.auth.onAuthStateChange((event: any, session: any) => {
           if (event === 'SIGNED_IN' && session) {
             clearTimeout(timeout);
             if (isMounted) setStatus("Verification successful! Redirecting...");
             const next = searchParams.get('next') || '/web/dashboard';
-            window.location.href = next;
+            logEvent("login", session.user.id).finally(() => {
+              window.location.href = next;
+            });
           }
         });
 

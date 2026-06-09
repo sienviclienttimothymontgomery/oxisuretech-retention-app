@@ -7,6 +7,7 @@ import { ArrowLeft, Tag, ExternalLink, ShoppingCart, Check, Shield, Truck, Rotat
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import { buildCartUrl, getDiscountTier, SHOPIFY_CONFIG } from "@/utils/shopify";
+import { logEvent } from "@/utils/analytics";
 
 type StatusType = "on-track" | "due-soon" | "overdue" | "recovery";
 
@@ -199,7 +200,22 @@ export default function ReorderPage() {
               </div>
 
               {/* CTA */}
-              <a href={cartUrl} target="_blank" rel="noopener noreferrer" className="block mt-6">
+              <a
+                href={cartUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block mt-6"
+                onClick={() => {
+                  logEvent('reorder_click', undefined, {
+                    quantity,
+                    days_left: daysLeft,
+                    discount_code: tier.code,
+                    discount_percent: tier.percent,
+                    subtotal,
+                    total,
+                  });
+                }}
+              >
                 <Button variant="primary" size="lg" fullWidth icon={<ShoppingCart size={18} />}>
                   Checkout on Shopify
                 </Button>
