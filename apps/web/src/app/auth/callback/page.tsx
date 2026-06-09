@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { Loader2 } from "lucide-react";
 import Image from "next/image";
+import { logEvent } from "@/utils/analytics";
 
 /**
  * Client-side OAuth callback handler.
@@ -49,20 +50,21 @@ function CallbackContent() {
 
           if (error) {
             console.error("[Auth Callback] Code exchange failed:", error.message);
-            if (isMounted) router.push("/auth/auth-code-error");
+            router.push(`/auth/auth-code-error?error=code_exchange_failed&description=${encodeURIComponent(error.message)}`);
             return;
           }
 
           if (data.session) {
             if (isMounted) setStatus("Sign-in successful! Redirecting...");
+            await logEvent("login", data.session.user.id);
             // Small delay to allow cookies to propagate
             await new Promise((r) => setTimeout(r, 300));
-            if (isMounted) window.location.href = next;
+            window.location.href = next;
             return;
           }
         }
 
-        // 2. Check for tokens in the hash fragment (#access_token=xxx)
+        // 2. Check for tokens in the hash fragment (#access_token=xxx&refresh_token=yyy)
         const hash = window.location.hash;
         if (hash) {
           const hashParams = new URLSearchParams(hash.substring(1));
@@ -70,7 +72,7 @@ function CallbackContent() {
           if (hashParams.has("error_description")) {
             const desc = hashParams.get("error_description") || "Unknown error";
             console.error("[Auth Callback] Hash error:", desc);
-            if (isMounted) router.push("/auth/auth-code-error");
+            router.push("/auth/auth-code-error");
             return;
           }
 
@@ -86,14 +88,15 @@ function CallbackContent() {
 
             if (error) {
               console.error("[Auth Callback] setSession failed:", error.message);
-              if (isMounted) router.push("/auth/auth-code-error");
+              router.push(`/auth/auth-code-error?error=setsession_failed&description=${encodeURIComponent(error.message)}`);
               return;
             }
 
             if (data.session) {
               if (isMounted) setStatus("Sign-in successful! Redirecting...");
+              await logEvent("login", data.session.user.id);
               await new Promise((r) => setTimeout(r, 300));
-              if (isMounted) window.location.href = next;
+              window.location.href = next;
               return;
             }
           }
@@ -104,7 +107,7 @@ function CallbackContent() {
         if (session) {
           if (isMounted) setStatus("Already signed in. Redirecting...");
           await new Promise((r) => setTimeout(r, 300));
-          if (isMounted) window.location.href = searchParams.get("next") || "/";
+          window.location.href = searchParams.get("next") || "/";
           return;
         }
 
@@ -113,19 +116,21 @@ function CallbackContent() {
           if (isMounted) {
             setStatus("Something went wrong. Redirecting...");
             setTimeout(() => {
-              if (isMounted) router.push("/auth/auth-code-error");
+              router.push("/auth/auth-code-error");
             }, 1500);
           }
         }, 8000);
 
         const { data: authListener } = supabase.auth.onAuthStateChange(
-          (event, session) => {
+          (event: any, session: any) => {
             if (event === "SIGNED_IN" && session) {
               clearTimeout(timeout);
               if (isMounted) {
                 setStatus("Sign-in successful! Redirecting...");
-                window.location.href = searchParams.get("next") || "/";
               }
+              logEvent("login", session.user.id).finally(() => {
+                window.location.href = searchParams.get("next") || "/";
+              });
             }
           }
         );
@@ -136,7 +141,7 @@ function CallbackContent() {
         };
       } catch (err) {
         console.error("[Auth Callback] Fatal error:", err);
-        if (isMounted) router.push("/auth/auth-code-error");
+        router.push("/auth/auth-code-error");
       }
     };
 
