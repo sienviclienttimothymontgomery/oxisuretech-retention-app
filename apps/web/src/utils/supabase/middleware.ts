@@ -38,16 +38,26 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  // refresh session if expired
-  if (!isPrefetch) {
-    console.log(`[Middleware] 🔑 Fetching active auth user...`)
-  }
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // Skip session refresh for the OAuth callback route to avoid cookie conflicts during PKCE exchange
+  const isCallbackRoute = request.nextUrl.pathname.startsWith('/auth/callback')
+  let user = null
 
-  if (!isPrefetch) {
-    console.log(`[Middleware] 👤 Auth user result: ${user ? user.email : 'No active session'}`)
+  if (!isCallbackRoute) {
+    if (!isPrefetch) {
+      console.log(`[Middleware] 🔑 Fetching active auth user...`)
+    }
+    const {
+      data: { user: authUser },
+    } = await supabase.auth.getUser()
+    user = authUser
+
+    if (!isPrefetch) {
+      console.log(`[Middleware] 👤 Auth user result: ${user ? user.email : 'No active session'}`)
+    }
+  } else {
+    if (!isPrefetch) {
+      console.log(`[Middleware] ⏭️ Skipping session refresh for auth callback route.`)
+    }
   }
 
   // Handle Magic Link error redirects from Supabase
