@@ -44,11 +44,27 @@ function CallbackContent() {
         const code = searchParams.get("code");
 
         if (code) {
+          const getVerifiersLog = () => {
+            if (typeof window === "undefined") return {};
+            const items: Record<string, string> = {};
+            for (let i = 0; i < window.sessionStorage.length; i++) {
+              const k = window.sessionStorage.key(i);
+              if (k && k.endsWith("-code-verifier")) {
+                items[`sessionStorage:${k}`] = window.sessionStorage.getItem(k) || "";
+              }
+            }
+            for (let i = 0; i < window.localStorage.length; i++) {
+              const k = window.localStorage.key(i);
+              if (k && k.endsWith("-code-verifier")) {
+                items[`localStorage:${k}`] = window.localStorage.getItem(k) || "";
+              }
+            }
+            return items;
+          };
           console.log("[Auth Callback] Initiating PKCE exchange with details:", {
             code: code.substring(0, 10) + "...",
             documentCookies: typeof document !== "undefined" ? document.cookie : "N/A",
-            sessionStorageVerifier: typeof window !== "undefined" ? window.sessionStorage.getItem("__session-code-verifier") : "N/A",
-            localStorageVerifier: typeof window !== "undefined" ? window.localStorage.getItem("__session-code-verifier") : "N/A",
+            verifiersInStorage: getVerifiersLog(),
           });
           if (isMounted) setStatus("Exchanging authorization code...");
 

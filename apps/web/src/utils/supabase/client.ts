@@ -42,20 +42,54 @@ export function createClient() {
               value: parsed[name] ?? "",
             }))
 
-            // Fallback: if __session-code-verifier is missing, check sessionStorage and localStorage
-            const hasVerifier = cookiesList.some(c => c.name.endsWith('-code-verifier'))
-            if (!hasVerifier) {
-              const verifierKey = '__session-code-verifier'
-              const fallbackValue = 
-                window.sessionStorage.getItem(verifierKey) || 
-                window.localStorage.getItem(verifierKey)
-              
-              if (fallbackValue) {
-                console.log('[Supabase Client] ℹ️ Verifier missing in cookies, retrieved from storage fallback:', fallbackValue.substring(0, 10) + '...')
-                cookiesList.push({
-                  name: verifierKey,
-                  value: fallbackValue,
-                })
+            // Find if there's a valid (non-empty) code verifier in the cookies
+            const verifierCookie = cookiesList.find(c => c.name.endsWith('-code-verifier') && c.value)
+
+            if (!verifierCookie) {
+              let foundKey: string | null = null
+              let fallbackValue: string | null = null
+
+              // Search sessionStorage first
+              for (let i = 0; i < window.sessionStorage.length; i++) {
+                const key = window.sessionStorage.key(i)
+                if (key && key.endsWith('-code-verifier')) {
+                  const val = window.sessionStorage.getItem(key)
+                  if (val) {
+                    foundKey = key
+                    fallbackValue = val
+                    break
+                  }
+                }
+              }
+
+              // Search localStorage if not found in sessionStorage
+              if (!fallbackValue) {
+                for (let i = 0; i < window.localStorage.length; i++) {
+                  const key = window.localStorage.key(i)
+                  if (key && key.endsWith('-code-verifier')) {
+                    const val = window.localStorage.getItem(key)
+                    if (val) {
+                      foundKey = key
+                      fallbackValue = val
+                      break
+                    }
+                  }
+                }
+              }
+
+              if (foundKey && fallbackValue) {
+                console.log(`[Supabase Client] ℹ️ Verifier missing or empty in cookies. Retrieved from storage fallback (${foundKey}):`, fallbackValue.substring(0, 10) + '...')
+                
+                // If the cookie existed but was empty, update its value; otherwise, add it.
+                const existingIndex = cookiesList.findIndex(c => c.name === foundKey)
+                if (existingIndex > -1) {
+                  cookiesList[existingIndex].value = fallbackValue
+                } else {
+                  cookiesList.push({
+                    name: foundKey,
+                    value: fallbackValue,
+                  })
+                }
               }
             }
 
