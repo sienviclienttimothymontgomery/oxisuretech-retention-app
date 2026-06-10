@@ -41,11 +41,13 @@ export default function LoginForm({ type, redirectTo }: { type: 'app' | 'web'; r
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    console.log('[LoginForm] handleEmailLogin triggered. Mode:', webMode, 'Email:', email)
     setLoading(true)
     setError(null)
     setMessage(null)
 
     if (type === 'web' && webMode === 'magic') {
+      console.log('[LoginForm] Attempting magic link login for email:', email)
       // Magic link via Edge Function (uses Resend for branded emails)
       let sent = false
       try {
@@ -57,13 +59,15 @@ export default function LoginForm({ type, redirectTo }: { type: 'app' | 'web'; r
         })
         if (error) throw error
         if (data?.error) throw new Error(data.error)
+        console.log('[LoginForm] Magic link Edge Function sent successfully:', data)
         sent = true
       } catch (e: any) {
-        console.warn('Edge Function failed:', e?.message)
+        console.warn('[LoginForm] Edge Function failed:', e?.message || e)
       }
 
       // Fallback: only if Edge Function is completely unreachable
       if (!sent) {
+        console.log('[LoginForm] Falling back to standard signInWithOtp...')
         const { error: otpError } = await supabase.auth.signInWithOtp({
           email,
           options: {
@@ -71,37 +75,43 @@ export default function LoginForm({ type, redirectTo }: { type: 'app' | 'web'; r
           },
         })
         if (otpError) {
+          console.error('[LoginForm] signInWithOtp error:', otpError)
           setError(otpError.message)
           setLoading(false)
           return
         }
       }
 
+      console.log('[LoginForm] Magic link flow completed, redirecting to check-email')
       router.push('/web/check-email')
       return
     } else {
       // Password login (works for both app and web)
+      console.log('[LoginForm] Attempting password login for:', email)
       try {
         const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         })
+        console.log('[LoginForm] signInWithPassword response. Data:', !!data?.session, 'Error:', error?.message || null)
         if (error) {
           setError(error.message)
         } else if (data?.session) {
           // Log login event
+          console.log('[LoginForm] Sign-in succeeded. Establishing session...')
           await logEvent('login', data.session.user.id);
           // Session is confirmed from the sign-in response itself — no need for a separate getSession() call
           // which can be unreliable with @supabase/ssr due to cookie timing issues.
           // Small delay to ensure cookies are flushed to the browser cookie jar
           await new Promise(resolve => setTimeout(resolve, 150))
+          console.log('[LoginForm] Redirecting to:', destination)
           window.location.href = destination
           return
         } else {
           setError('Sign in succeeded but session could not be established. Please try again.')
         }
       } catch (err: any) {
-        console.error('Password signin error:', err)
+        console.error('[LoginForm] Password signin catch block error:', err)
         setError(err?.message || 'A connection error occurred. Please try again.')
       }
     }

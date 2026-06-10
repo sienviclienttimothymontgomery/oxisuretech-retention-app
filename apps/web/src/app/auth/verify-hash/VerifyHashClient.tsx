@@ -40,9 +40,6 @@ export default function VerifyHashClient() {
         if (accessToken && refreshToken) {
           if (isMounted) setStatus("Signing you in...");
 
-          // Sign out existing session silently (don't redirect)
-          await supabase.auth.signOut({ scope: 'local' });
-
           // Set the session from the magic link tokens
           const { data, error } = await supabase.auth.setSession({
             access_token: accessToken,
