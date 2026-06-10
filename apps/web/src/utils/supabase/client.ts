@@ -11,6 +11,9 @@ export function createClient() {
       {
         cookieOptions: {
           name: '__session',
+          path: '/',
+          sameSite: 'lax',
+          secure: process.env.NODE_ENV === 'production',
         },
         cookieEncoding: 'raw',
         isSingleton: false,
@@ -20,13 +23,16 @@ export function createClient() {
 
   // Client-side (browser): Use a module-scoped singleton to prevent state divergence
   if (!client) {
-    console.log('[Supabase Client] 🚀 Initializing standard browser client with implicit flow...')
+    console.log('[Supabase Client] 🚀 Initializing standard browser client with explicit path and sameSite settings...')
     client = createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookieOptions: {
           name: '__session',
+          path: '/',
+          sameSite: 'lax',
+          secure: process.env.NODE_ENV === 'production',
         },
         cookieEncoding: 'raw',
         isSingleton: true,

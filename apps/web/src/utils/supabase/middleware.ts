@@ -43,6 +43,9 @@ export async function updateSession(request: NextRequest) {
     {
       cookieOptions: {
         name: '__session',
+        path: '/',
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
       },
       cookieEncoding: 'raw',
       cookies: {
