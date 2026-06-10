@@ -34,6 +34,48 @@ export default function CallbackClient() {
         const code = searchParams.get("code");
 
         if (code) {
+          // Manually restore the code verifier cookie from sessionStorage/localStorage
+          if (typeof window !== "undefined") {
+            let verifierValue = "";
+            let foundKey = "";
+            for (let i = 0; i < window.sessionStorage.length; i++) {
+              const k = window.sessionStorage.key(i);
+              if (k && k.endsWith("-code-verifier")) {
+                verifierValue = window.sessionStorage.getItem(k) || "";
+                foundKey = k;
+                break;
+              }
+            }
+            if (!verifierValue) {
+              for (let i = 0; i < window.localStorage.length; i++) {
+                const k = window.localStorage.key(i);
+                if (k && k.endsWith("-code-verifier")) {
+                  verifierValue = window.localStorage.getItem(k) || "";
+                  foundKey = k;
+                  break;
+                }
+              }
+            }
+
+            if (verifierValue) {
+              console.log(`[Auth Callback] Restoring code verifier cookie for key "${foundKey}":`, verifierValue.substring(0, 10) + "...");
+              const secureFlag = window.location.protocol === "https:" ? "; Secure" : "";
+              
+              // Write to both __session-code-verifier and the default sb-[ref]-auth-token-code-verifier names
+              document.cookie = `__session-code-verifier=${encodeURIComponent(verifierValue)}; path=/; SameSite=Lax${secureFlag}`;
+              
+              // We also set the raw project-ref prefixed key in case the SDK queries for that
+              const projectRef = foundKey.replace("-code-verifier", "").replace("-auth-token", "");
+              if (projectRef && projectRef !== foundKey) {
+                document.cookie = `${projectRef}-code-verifier=${encodeURIComponent(verifierValue)}; path=/; SameSite=Lax${secureFlag}`;
+              }
+            } else {
+              console.warn("[Auth Callback] No code verifier found in sessionStorage or localStorage");
+            }
+          }
+        }
+
+        if (code) {
           const getVerifiersLog = () => {
             if (typeof window === "undefined") return {};
             const items: Record<string, string> = {};
