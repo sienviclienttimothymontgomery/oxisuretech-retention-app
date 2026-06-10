@@ -21,6 +21,15 @@ export default function CallbackClient() {
 
     const processCallback = async () => {
       try {
+        // Resolve domain mismatch (Firebase App Hosting hosted.app -> web.app custom domain)
+        if (typeof window !== "undefined" && window.location.hostname.endsWith(".hosted.app")) {
+          console.log("[Auth Callback] Mismatch domain detected. Redirecting to production domain...");
+          const targetUrl = new URL(window.location.href);
+          targetUrl.hostname = "oxisuretech-retention-app.web.app";
+          window.location.href = targetUrl.toString();
+          return;
+        }
+
         const next = searchParams.get("next") || "/";
         const code = searchParams.get("code");
 

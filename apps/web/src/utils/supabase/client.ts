@@ -30,11 +30,6 @@ export function createClient() {
         },
         cookieEncoding: 'raw',
         isSingleton: true,
-        auth: {
-          flowType: 'implicit',
-          persistSession: true,
-          detectSessionInUrl: true,
-        }
       }
     )
   }

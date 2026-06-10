@@ -20,6 +20,15 @@ export async function updateSession(request: NextRequest) {
   const isPrefetch = request.headers.get('x-middleware-prefetch') === '1'
   const path = request.nextUrl.pathname
   
+  // Resolve domain mismatch: redirect all traffic from internal hosted.app domain to custom domain
+  const host = request.headers.get('host') || ''
+  if (host.includes('hosted.app')) {
+    const url = request.nextUrl.clone()
+    url.host = 'oxisuretech-retention-app.web.app'
+    console.log(`[Middleware] 🔄 Redirecting from internal domain ${host} to custom domain ${url.host}`)
+    return NextResponse.redirect(url, 301)
+  }
+
   if (!isPrefetch) {
     console.log(`[Middleware] 🌐 Request for: ${path} (Method: ${request.method})`)
   }
