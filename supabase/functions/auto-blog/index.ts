@@ -43,7 +43,11 @@ serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
+    const geminiApiKey =
+      Deno.env.get("GEMINI_API_KEY") ||
+      Deno.env.get("GOOGLE_AI_API_KEY") ||
+      Deno.env.get("GOOGLE_API_KEY");
+    const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     let body: any = {};
@@ -115,6 +119,45 @@ Return JSON with keys: "title", "excerpt", "content" (Markdown with H2/H3 headin
           excerpt = parsed.excerpt || excerpt;
           content = parsed.content || content;
         }
+      }
+    }
+
+    if (openaiApiKey && title === selected.topic) {
+      try {
+        const oaRes = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${openaiApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "gpt-4o-mini",
+            response_format: { type: "json_object" },
+            messages: [
+              {
+                role: "system",
+                content:
+                  "You are an expert clinical equipment lifecycle & SEO writer for OxiSure Tech Solutions. Return JSON with keys: title, excerpt, content (Markdown with H2/H3 headings and FAQ section).",
+              },
+              {
+                role: "user",
+                content: `Topic: ${selected.topic}\nCategory: ${selected.category}\nTarget Keywords: ${selected.keywords.join(", ")}`,
+              },
+            ],
+          }),
+        });
+        if (oaRes.ok) {
+          const oaData = await oaRes.json();
+          const text = oaData?.choices?.[0]?.message?.content;
+          if (text) {
+            const parsed = JSON.parse(text);
+            title = parsed.title || title;
+            excerpt = parsed.excerpt || excerpt;
+            content = parsed.content || content;
+          }
+        }
+      } catch (_e) {
+        // Fallback to structured template
       }
     }
 
