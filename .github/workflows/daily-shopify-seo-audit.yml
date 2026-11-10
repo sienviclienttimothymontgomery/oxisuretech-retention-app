@@ -1,0 +1,39 @@
+name: Daily OxiSure Tech Shopify SEO & Sitemap Audit
+
+on:
+  schedule:
+    # Runs daily at 05:45 UTC (1:45 PM PHT)
+    - cron: '45 5 * * *'
+  workflow_dispatch:
+
+jobs:
+  shopify-seo-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify OxiSure Tech Shopify Storefront, Sitemap & Robots
+        env:
+          STORE_URL: ${{ secrets.SHOPIFY_STORE_URL || 'https://oxisuretechsolutions.com' }}
+        run: |
+          for path in "/sitemap.xml" "/robots.txt" "/"; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L "${STORE_URL}${path}")
+            echo "Checked ${STORE_URL}${path} -> HTTP ${STATUS}"
+            if [ "$STATUS" -ge 500 ] || [ "$STATUS" -eq 000 ]; then
+              echo "Error: ${STORE_URL}${path} returned HTTP ${STATUS}"
+              exit 1
+            fi
+          done
+
+      - name: Trigger Supabase Daily Shopify SEO Audit Edge Function
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://hoqzujbwyphxzikuknsk.supabase.co/functions/v1/shopify-seo-audit" \
+            -H "Content-Type: application/json" \
+            -H "x-cron-trigger: true" \
+            -d '{"source": "github_actions_daily_shopify_seo_audit"}')
+          HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          echo "Edge Function HTTP Status: ${HTTP_STATUS}"
+          echo "Edge Function Response: ${BODY}"
+          if [ "$HTTP_STATUS" -ge 400 ]; then
+            exit 1
+          fi
