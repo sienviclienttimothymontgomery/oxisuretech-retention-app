@@ -304,103 +304,10 @@ async function auditSinglePage(url: string, label: string): Promise<PageAuditRes
   };
 }
 
-async function attemptShopifyAdminAutoRemediation(): Promise<{
-  attempted: boolean;
-  updated_resources: string[];
-  diagnostic: string;
-}> {
-  const token = Deno.env.get("SHOPIFY_ACCESS_TOKEN");
-  const domain = Deno.env.get("SHOPIFY_STORE_DOMAIN") || "oxisure-tech.myshopify.com";
-  if (!token || token === "placeholder" || token.length < 10) {
-    return {
-      attempted: false,
-      updated_resources: [],
-      diagnostic: "SHOPIFY_ACCESS_TOKEN not configured for write-back; generated ready-to-apply remediation snippets.",
-    };
-  }
-
-  const updated: string[] = [];
-  try {
-    // 1. Check if token can access Shopify Pages API to fix page SEO descriptions & H1s
-    const pagesRes = await fetch(`https://${domain}/admin/api/2024-10/pages.json`, {
-      headers: {
-        "X-Shopify-Access-Token": token,
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!pagesRes.ok) {
-      return {
-        attempted: true,
-        updated_resources: [],
-        diagnostic: `Shopify Admin API returned HTTP ${pagesRes.status}; remediation snippets prepared in issue_remediations.`,
-      };
-    }
-
-    const pagesData = await pagesRes.json();
-    const pages = pagesData?.pages || [];
-    for (const p of pages) {
-      if (p.handle === "wholesale-portal" || p.handle === "wholesale-quick-order") {
-        await fetch(`https://${domain}/admin/api/2024-10/pages/${p.id}.json`, {
-          method: "PUT",
-          headers: {
-            "X-Shopify-Access-Token": token,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            page: {
-              id: p.id,
-              metafields_global_title_tag:
-                "Wholesale Oxygen Tubing Portal | 25 & 50-Pack DME Case Packs — OxiSure Tech",
-              metafields_global_description_tag:
-                "Institutional B2B ordering portal for OxiSure crush-resistant oxygen tubing. Direct 25-pack ($562.50) and 50-pack ($1,125) clinical case pricing for DMEs and clinics.",
-            },
-          }),
-        });
-        updated.push(`page:${p.handle}`);
-      } else if (p.handle === "wholesale-application") {
-        await fetch(`https://${domain}/admin/api/2024-10/pages/${p.id}.json`, {
-          method: "PUT",
-          headers: {
-            "X-Shopify-Access-Token": token,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            page: {
-              id: p.id,
-              metafields_global_title_tag:
-                "Apply for Institutional B2B Wholesale Account | DME & Clinic Supply — OxiSure Tech",
-              metafields_global_description_tag:
-                "Apply for an OxiSure Tech institutional wholesale account. Access bulk case-pack pricing on medical-grade crush-resistant oxygen tubing for pulmonary clinics and DMEs.",
-            },
-          }),
-        });
-        updated.push(`page:${p.handle}`);
-      }
-    }
-
-    return {
-      attempted: true,
-      updated_resources: updated,
-      diagnostic:
-        updated.length > 0
-          ? `Automatically updated SEO meta tags on ${updated.length} Shopify resource(s): ${updated.join(", ")}`
-          : "Shopify Admin API reachable; no mutable page handles matched.",
-    };
-  } catch (err) {
-    return {
-      attempted: true,
-      updated_resources: updated,
-      diagnostic: `Shopify Admin remediation check failed gracefully: ${(err as Error).message}`,
-    };
-  }
-}
-
 function buildIssueRemediations(
   auditedPages: PageAuditResult[],
   hasRobotsTxt: boolean,
-  hasSitemapXml: boolean,
-  shopifyAutoResult: { attempted: boolean; updated_resources: string[]; diagnostic: string }
+  hasSitemapXml: boolean
 ): IssueRemediation[] {
   const remediations: IssueRemediation[] = [];
 
@@ -419,7 +326,7 @@ function buildIssueRemediations(
           category: "meta_tags",
           target_url: page.url,
           auto_remediated: true,
-          remediation_status: "auto_addressed_via_care_guide_and_theme_snippet",
+          remediation_status: "reported_to_wizard_lab_and_addressed_via_care_guide",
           recommended_fix:
             "Set Homepage Meta Description in Shopify Admin -> Online Store -> Preferences (or inject fallback in layout/theme.liquid when page_description is blank) AND publish keyword-targeted Care Guides linking back to homepage.",
           copy_paste_snippet:
@@ -432,7 +339,7 @@ function buildIssueRemediations(
           category: "meta_tags",
           target_url: page.url,
           auto_remediated: true,
-          remediation_status: "auto_addressed_via_care_guide_and_theme_snippet",
+          remediation_status: "reported_to_wizard_lab_and_addressed_via_care_guide",
           recommended_fix:
             "Update Blog SEO description in Online Store -> Blog Posts -> Manage Blogs -> News, and mirror daily Care Guides with full 155-char meta_description.",
           copy_paste_snippet:
@@ -445,22 +352,19 @@ function buildIssueRemediations(
           category: "meta_tags",
           target_url: page.url,
           auto_remediated: false,
-          remediation_status: "ready_to_apply_snippet",
+          remediation_status: "reported_to_wizard_lab",
           recommended_fix: `Add a 150-160 character keyword-rich <meta name="description"> tag for ${page.url}.`,
           copy_paste_snippet: `<meta name="description" content="Shop OxiSure Tech medical-grade crush-resistant oxygen tubing and home oxygen therapy supplies.">`,
         });
       }
     } else if (page.meta_description_length > 170) {
-      const autoFixed =
-        (isWholesalePortal && shopifyAutoResult.updated_resources.includes("page:wholesale-portal")) ||
-        (isWholesaleApp && shopifyAutoResult.updated_resources.includes("page:wholesale-application"));
       remediations.push({
         issue: `Meta description exceeds 160 chars (${page.meta_description_length} chars auto-extracted from body text) on ${page.url}`,
         severity: "medium",
         category: "meta_tags",
         target_url: page.url,
-        auto_remediated: autoFixed,
-        remediation_status: autoFixed ? "auto_remediated_shopify_api" : "ready_to_apply_snippet",
+        auto_remediated: false,
+        remediation_status: "reported_to_wizard_lab",
         recommended_fix:
           "Replace auto-extracted body text meta description with a concise 155-character B2B wholesale meta description.",
         copy_paste_snippet: isWholesalePortal
@@ -476,7 +380,7 @@ function buildIssueRemediations(
         category: "meta_tags",
         target_url: page.url,
         auto_remediated: true,
-        remediation_status: "auto_addressed_via_care_guide_and_theme_snippet",
+        remediation_status: "reported_to_wizard_lab_and_addressed_via_care_guide",
         recommended_fix:
           "Expand <title> tag to 55-60 characters targeting 'Crush-Resistant Oxygen Tubing & Home Oxygen Therapy Supplies'.",
         copy_paste_snippet: isHomepage
@@ -492,7 +396,7 @@ function buildIssueRemediations(
         category: "headings",
         target_url: page.url,
         auto_remediated: false,
-        remediation_status: "ready_to_apply_snippet",
+        remediation_status: "reported_to_wizard_lab",
         recommended_fix: `Ensure the hero heading in ${page.label} uses a semantic <h1> element containing the primary B2B keyword.`,
         copy_paste_snippet: isWholesalePortal
           ? '<h1 class="oxisure-b2b-title">Institutional Wholesale Oxygen Tubing Ordering Portal</h1>'
@@ -507,7 +411,7 @@ function buildIssueRemediations(
         category: "canonical",
         target_url: page.url,
         auto_remediated: isRetentionApp,
-        remediation_status: isRetentionApp ? "auto_remediated_in_repo" : "ready_to_apply_snippet",
+        remediation_status: isRetentionApp ? "auto_remediated_in_repo" : "reported_to_wizard_lab",
         recommended_fix: `Add self-referencing canonical link in <head> of ${page.url}.`,
         copy_paste_snippet: `<link rel="canonical" href="${page.url}" />`,
       });
@@ -520,7 +424,7 @@ function buildIssueRemediations(
         category: "structured_data",
         target_url: page.url,
         auto_remediated: isRetentionApp,
-        remediation_status: isRetentionApp ? "auto_remediated_in_repo" : "ready_to_apply_snippet",
+        remediation_status: isRetentionApp ? "auto_remediated_in_repo" : "reported_to_wizard_lab",
         recommended_fix: `Embed MedicalBusiness + WebApplication JSON-LD schema in <head> of ${page.url}.`,
         copy_paste_snippet: JSON.stringify(
           {
@@ -550,7 +454,7 @@ function buildIssueRemediations(
       category: "meta_tags",
       target_url: "https://oxisuretechsolutions.com/robots.txt",
       auto_remediated: false,
-      remediation_status: "ready_to_apply_snippet",
+      remediation_status: "reported_to_wizard_lab",
       recommended_fix: "Verify Shopify robots.txt.liquid template is enabled and references sitemap.xml.",
       copy_paste_snippet: "User-agent: *\nAllow: /\nSitemap: https://oxisuretechsolutions.com/sitemap.xml",
     });
@@ -563,7 +467,7 @@ function buildIssueRemediations(
       category: "meta_tags",
       target_url: "https://oxisuretechsolutions.com/sitemap.xml",
       auto_remediated: false,
-      remediation_status: "ready_to_apply_snippet",
+      remediation_status: "reported_to_wizard_lab",
       recommended_fix: "Submit https://oxisuretechsolutions.com/sitemap.xml in Google Search Console & Bing Webmaster Tools.",
       copy_paste_snippet: "https://oxisuretechsolutions.com/sitemap.xml",
     });
@@ -627,10 +531,7 @@ Deno.serve(async (req: Request) => {
       hasSitemapXml = false;
     }
 
-    // 3. Attempt automated Shopify Admin API remediation if credentials are present
-    const shopifyAutoResult = await attemptShopifyAdminAutoRemediation();
-
-    // 4. Build comprehensive issue list & structured remediations
+    // 3. Build comprehensive issue list & structured remediations (read-only audit reported to Timer Management Wizard Lab)
     const allIssues: string[] = [];
     if (!homepageAudit.meta_description) {
       allIssues.push("Missing meta description on homepage");
@@ -646,11 +547,10 @@ Deno.serve(async (req: Request) => {
     const issueRemediations = buildIssueRemediations(
       auditedPages,
       hasRobotsTxt,
-      hasSitemapXml,
-      shopifyAutoResult
+      hasSitemapXml
     );
 
-    // 5. Generate Daily Keyword Suggestions by comparing OXISURE_KEYWORD_RESEARCH_BANK with existing care_guides
+    // 4. Generate Daily Keyword Suggestions by comparing OXISURE_KEYWORD_RESEARCH_BANK with existing care_guides
     const { data: existingGuides } = await supabase
       .from("care_guides")
       .select("id, title, slug, content, seo_keywords")
@@ -693,7 +593,7 @@ Deno.serve(async (req: Request) => {
       suggested_article_angle: k.suggested_article_angle,
     }));
 
-    // 6. Ping IndexNow with all audited pages + sitemap
+    // 5. Ping IndexNow with all audited pages + sitemap
     let indexNowPinged = false;
     try {
       const indexNowRes = await fetch("https://api.indexnow.org/indexnow", {
@@ -716,7 +616,7 @@ Deno.serve(async (req: Request) => {
       indexNowPinged = false;
     }
 
-    // 7. Compute overall SEO score
+    // 6. Compute overall SEO score
     let seoScore = 100;
     if (homepageAudit.status_code !== 200) seoScore -= 40;
     if (!homepageAudit.title) seoScore -= 15;
@@ -731,6 +631,8 @@ Deno.serve(async (req: Request) => {
     const rawSummary = {
       audited_at: new Date().toISOString(),
       source: reqBody.source || "manual_or_cron",
+      reporting_target: "Timer Management Wizard Lab (project_timers / shopify_seo_audits)",
+      shopify_mode: "read_only_audit",
       store_url: storeUrl,
       seo_score: seoScore,
       total_pages_audited: auditedPages.length,
@@ -738,7 +640,6 @@ Deno.serve(async (req: Request) => {
       total_remediations_prepared: issueRemediations.length,
       total_keyword_suggestions: dailyKeywordSuggestions.length,
       top_suggested_keywords: dailyKeywordSuggestions.slice(0, 4).map((k) => k.keyword),
-      shopify_admin_auto_remediation: shopifyAutoResult,
       indexnow_pinged: indexNowPinged,
     };
 
